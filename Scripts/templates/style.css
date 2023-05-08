@@ -22,7 +22,7 @@ table {
 }
   
 th {
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 25%, rgba(114, 2, 2, 0.5));
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 50%, rgba(200, 50, 50, 1));
     letter-spacing: 2px;
     padding: 10px;
     border: 2px;
@@ -62,4 +62,10 @@ session_info{
 
 h3{
   text-align: center;
+}
+
+.colonne{
+  float: left;
+  width: fit-content;
+  padding-right: 10px;
 }

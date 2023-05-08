@@ -98,8 +98,13 @@ class Prism_HoursTrackerV2_Functions(object):
         self.user_data_js = self.user_data_dir + 'hours.js'
         self.user_data_html = self.user_data_dir + 'hours.html'
         self.user_data_css = self.user_data_dir + 'style.css'
-        self.user_data_backup = self.user_data_dir + '/backup/'
+        self.user_data_backup = self.user_data_dir + 'backup/'
+        self.user_list_backup_json =  self.user_data_dir + 'backups.json'
+        self.user_list_backup_js =  self.user_data_dir + 'backups.js'
         self.user_log = self.user_data_dir + 'log.txt'
+
+        if not os.path.exists(self.user_log):
+            open(self.user_log, 'a').close()
 
         if not os.path.exists(self.user_data_dir):
             os.makedirs(self.user_data_dir)
@@ -107,15 +112,21 @@ class Prism_HoursTrackerV2_Functions(object):
         if not os.path.exists(self.user_data_backup):
             os.makedirs(self.user_data_backup)
 
+        if not os.path.exists(self.user_list_backup_json):
+            self.log("backup_json doesnt exist")
+            with open(self.user_list_backup_json, 'a') as json_file:
+                json_file.write('{}')
+
+        if not os.path.exists(self.user_list_backup_js):
+            open(self.user_list_backup_js, 'a').close()
+
         if not os.path.exists(self.user_data_json):
             with open(self.user_data_json, 'a') as json_file:
                 json_file.write('{}')
 
         if not os.path.exists(self.user_data_js):
             open(self.user_data_js, 'a').close()
-
-        if not os.path.exists(self.user_log):
-            open(self.user_log, 'a').close()
+        
 
         if not os.path.exists(self.user_data_html):
             src = 'R:/Prism/Plugins/{version}/HoursTracker/Scripts/templates/hours.html'.format(version=version)
@@ -335,7 +346,7 @@ class Prism_HoursTrackerV2_Functions(object):
             year -= 1
             week = 52
 
-        # write
+        # write hours data
         src = self.user_data_json
         dst = f"{self.user_data_backup}{week}_{year}_hours.json"
         shutil.copy(src, dst)
@@ -345,8 +356,22 @@ class Prism_HoursTrackerV2_Functions(object):
         shutil.copy(src, dst)
 
         src = self.user_log
-        dst = f"{self.user_data_backup}{week}_{year}__log.txt"
+        dst = f"{self.user_data_backup}{week}_{year}_log.txt"
         shutil.copy(src, dst)
+
+        # write backup data
+        new_bckp = self.create_backup_info(week, year, f"{self.user_data_backup}{week}_{year}_hours.js")
+        bckp_info = self.get_data(self.user_list_backup_json)
+        if bckp_info == {}:
+            bckp_info = {"backups":[]}
+        bckp_info.get('backups').append(new_bckp)
+
+        js_obj = json.dumps(bckp_info)
+        content = f"var data = '{js_obj}'"
+        self.write_to_file(content, self.user_list_backup_js)
+
+        json_obj = json.dumps(bckp_info, indent=4)
+        self.write_to_file(json_obj, self.user_list_backup_json)
 
         self.write_to_file('', self.user_log)
     
@@ -356,6 +381,15 @@ class Prism_HoursTrackerV2_Functions(object):
         """
         with open(self.user_data_json, 'a') as json_file:
                 json_file.write('{}')
+
+    def create_backup_info(self,week, year, path):
+        bkp = {
+            "week": str(week),
+            "year": str(year),
+            "path": path 
+        }
+
+        return bkp
 #pragma endregion file
 
 #pragma region modify_data
@@ -382,10 +416,6 @@ class Prism_HoursTrackerV2_Functions(object):
                     if ps.get('asset_name') == entity.get('asset_name') and ps.get('department') == entity.get('department'):
                         ps.get('asset_sessions').append(session)
                         self.log('asset session added')
-
-
-
-
 #pragme enregion modify_data
 
 #pragma region check_data
