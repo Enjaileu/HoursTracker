@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="style.css" rel="stylesheet">
+
+    </head>
+    <body>
+        <img src = "R:/MenhirFX_ressourcesEntreprise/_Logo/GRADIENT/LOGO_D_FOND_NOIR_MENHIRFX.png", class="center">   
+        <h3 id="hello"></h3>
+        <h4 id="week"></h4>
+        <script type='text/javascript' src='hours.js'></script>
+        <script>
+            // get data
+            var json_data = JSON.parse(data);
+
+            // body
+            var body = document.getElementsByTagName("body")[0];
+            
+            // user
+            user = json_data['user_id'];
+            document.getElementById("hello").innerHTML = "Hello " + user + " !";
+
+            // week
+            week_nb = json_data['week'];
+            year = json_data['year'];
+            text = "Here is the summary of your work for week " + week_nb + " of " + year + ".";
+            document.getElementById("week").innerHTML = text;
+
+            // containers
+            var tbl = document.createElement("table");
+            var tblBody = document.createElement("tbody");
+
+            // creating all cells
+            var header_row = document.createElement('tr')
+            var session_row = document.createElement('tr')
+
+            // each day
+            
+            for (var i = 0; i < json_data.days.length; i++) {
+                var col = document.createElement('th')
+                var date = json_data.days[i].date
+                var cellText = document.createTextNode(date);
+                col.appendChild(cellText);
+                header_row.appendChild(col)
+                var session_data = document.createElement('td')
+                session_data.setAttribute("border", "2")
+
+                // for each project
+                for(var j = 0; j < json_data.days[i].projects.length; j++){
+                    var row = document.createElement('tr')
+                    row.setAttribute("border", "2")
+                    var cell = document.createElement('td')
+                    var title = document.createElement('session_title')
+                    var project = json_data.days[i].projects[j].project_name
+                    var project_text = document.createTextNode(project);
+
+                    title.appendChild(project_text)
+                    cell.appendChild(title)
+                    
+                    // for each asset
+                    for(var k = 0; k < json_data.days[i].projects[j].project_sessions.length; k++){
+                        var infos = document.createElement('session_info')
+                        var total = json_data.days[i].projects[j].project_sessions[k].total_time 
+                        var asset_name = json_data.days[i].projects[j].project_sessions[k].asset_name
+                        var department = json_data.days[i].projects[j].project_sessions[k].department
+                    
+                        var total_text = document.createTextNode(total);
+                        var asset_text = document.createTextNode(asset_name + '  ' + department + ' : ' + total);
+                        var br1 = document.createElement("br");
+                        var br2 = document.createElement("br");
+                        var br3 = document.createElement("br");
+
+                        infos.appendChild(asset_text)
+
+                        cell.appendChild(br2)
+                        cell.appendChild(br3)
+                        cell.appendChild(infos)
+                    }
+
+                    row.appendChild(cell)
+                    session_data.appendChild(row);
+                    session_row.appendChild(session_data)
+                }
+                
+                tblBody.appendChild(header_row);
+                tblBody.appendChild(session_row);
+                
+            }
+            tblBody.setAttribute("border", "2")
+            // put the <tbody> in the <table>
+            tbl.appendChild(tblBody);
+            // appends <table> into <body>
+            body.appendChild(tbl);
+            // sets the border attribute of tbl to 2;
+            tbl.setAttribute("border", "2");
+        
+
+        </script>
+
+        <p id="test">coucou</p>
+        <a href="./backup">
+            Click to open backup folder
+        </a>
+        <script type='text/javascript'>
+
+        </script>>
+    </body>
+</html>

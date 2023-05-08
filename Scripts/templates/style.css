@@ -1,0 +1,49 @@
+html {
+  font-family: 'helvetica neue', helvetica, arial, sans-serif;
+  background-color: rgb(21, 21, 21);
+}
+
+body {
+  color: white;
+  padding: 10px;
+}
+
+table {
+    table-layout: auto;
+    width: 100%;
+    border-collapse: separate;
+    color: white;
+    margin-top: 20px;
+    border: 0px;
+    border-spacing: 20pxs;
+}
+  
+th {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 25%, rgba(114, 2, 2, 0.5));
+    letter-spacing: 2px;
+    padding: 10px;
+  }
+
+td{
+  padding: 15px;
+  text-align: right;
+}
+
+session_title{
+  font-family: 'helvetica neue', helvetica bold, arial, sans-serif;
+  font-size: 120%;
+}
+
+.center{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 7%;
+}
+
+h3{
+  text-align: center;
+}
+a{
+  color : white;
+}
