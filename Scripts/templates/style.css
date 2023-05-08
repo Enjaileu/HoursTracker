@@ -14,24 +14,43 @@ table {
     border-collapse: separate;
     color: white;
     margin-top: 20px;
-    border: 0px;
-    border-spacing: 20pxs;
+    border: 2px;
+    border-top: 0px;
+    border-left: 20px;
+    border-right: 20px;
+    border-color: white;
 }
   
 th {
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 25%, rgba(114, 2, 2, 0.5));
     letter-spacing: 2px;
     padding: 10px;
+    border: 2px;
   }
 
 td{
   padding: 15px;
+  background-color: rgb(40, 40, 40);
+  border: 2px;
   text-align: right;
+}
+
+tr{
+  align-items: right;
 }
 
 session_title{
   font-family: 'helvetica neue', helvetica bold, arial, sans-serif;
   font-size: 120%;
+  text-align: left;
+  color:rgba(255, 255, 255, 0.8);
+  align-self: left;
+  align-content: left;
+  align-items: left;
+}
+
+session_info{
+  color:rgba(255, 255, 255, 1);
 }
 
 .center{
@@ -43,7 +62,4 @@ session_title{
 
 h3{
   text-align: center;
-}
-a{
-  color : white;
 }

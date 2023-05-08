@@ -329,6 +329,13 @@ class Prism_HoursTrackerV2_Functions(object):
         """
         Copies the user's json data to a backup location
         """
+        # last week and last year
+        week = week-1
+        if week==0:
+            year -= 1
+            week = 52
+
+        # write
         src = self.user_data_json
         dst = f"{self.user_data_backup}{week}_{year}_hours.json"
         shutil.copy(src, dst)
@@ -361,11 +368,24 @@ class Prism_HoursTrackerV2_Functions(object):
         data.get('days')[-1].get('projects').append(project)
 
     def add_project_session(self, data, entity, session):
-        # TODO : Verify if need update of data
         projects = data.get('days')[-1].get('projects')
         for p in projects:
             if p.get('project_name') == self.get_current_project():
                 p.get('project_sessions').append(session)
+    
+    def add_asset_session(self, data, entity, session):
+        projects = data.get('days')[-1].get('projects')
+        for p in projects:
+            if p.get('project_name') == self.get_current_project():
+                project_sessions = p.get('project_sessions')
+                for ps in project_sessions:
+                    if ps.get('asset_name') == entity.get('asset_name') and ps.get('department') == entity.get('department'):
+                        ps.get('asset_sessions').append(session)
+                        self.log('asset session added')
+
+
+
+
 #pragme enregion modify_data
 
 #pragma region check_data
@@ -399,8 +419,6 @@ class Prism_HoursTrackerV2_Functions(object):
                     self.log(f's = {s}')
                     if s.get('asset_name') == entity.get('asset_name') and s.get('department') == entity.get('department'):
                         return True
-                    else:
-                        return False
         
         return False
 #pragma endregion check_data
@@ -478,7 +496,10 @@ class Prism_HoursTrackerV2_Functions(object):
                     self.add_project_session(data, entity, session)
                     self.update_last(data, entity)
 
-                # TODO : Check if asset session exist if not initialise it and populate 
+                # TODO : else, add sesssion
+                else: 
+                    session = self.initialise_asset_session(start_time)
+                    self.add_asset_session(data, entity, session)
                 
                 # Set last active project and set last file opened
                 self.update_last(data, entity)
