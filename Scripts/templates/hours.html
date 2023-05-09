@@ -18,9 +18,8 @@
             <h4 id="week"></h4>
             <div id="donnees"></div>
         </div>
+
         <script id="table">
-
-
             function createTable(){
             /*
             Create a table according the json file ressource
@@ -49,10 +48,14 @@
                 var session_row = document.createElement('tr')
                 var donnees = document.getElementById("donnees");
 
+                console.log(json_data.days)
+                console.log(json_data.days.length)
                 // each day, create a column
                 for (var i = 0; i < json_data.days.length; i++) {
+                    console.log(i)
                     var col = document.createElement('th')
                     var date = json_data.days[i].date
+                    console.log(date)
                     var cellText = document.createTextNode(date);
                     col.appendChild(cellText);
                     header_row.appendChild(col)
@@ -62,8 +65,12 @@
                     // for each project, create a cell
                     for(var j = 0; j < json_data.days[i].projects.length; j++){
                         var row = document.createElement('tr')
+                        row.setAttribute("class", "session_row")
                         row.setAttribute("border", "2")
                         var cell = document.createElement('td')
+                        cell.setAttribute("class", "cell")
+                        
+                        //cell.setAttribute("class", "session_row")
                         var title = document.createElement('session_title')
                         var project = json_data.days[i].projects[j].project_name
                         var project_text = document.createTextNode(project);
@@ -73,7 +80,8 @@
                         
                         // for each asset, create infos
                         for(var k = 0; k < json_data.days[i].projects[j].project_sessions.length; k++){
-                            var infos = document.createElement('session_info')
+                            var infos = document.createElement('td');
+                            infos.setAttribute('class', 'info');
                             var total = json_data.days[i].projects[j].project_sessions[k].total_time 
                             var asset_name = json_data.days[i].projects[j].project_sessions[k].asset_name
                             var department = json_data.days[i].projects[j].project_sessions[k].department
@@ -96,7 +104,7 @@
                         row.appendChild(cell)
                         session_data.appendChild(row);
                         session_row.appendChild(session_data)
-                    }
+                    } 
                     
                     // append containers in containers
 
@@ -105,8 +113,9 @@
                     tblBody.setAttribute("border", "2")
                     tbl.appendChild(tblBody);
 
-                    return tbl
+                    
                 }
+                return tbl
             
             }
 

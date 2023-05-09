@@ -19,6 +19,9 @@ table {
     border-left: 20px;
     border-right: 20px;
     border-color: white;
+
+    border-radius: 15px;
+    overflow: hidden;
 }
   
 th {
@@ -30,13 +33,11 @@ th {
 
 td{
   padding: 15px;
-  background-color: rgb(40, 40, 40);
+  background-color: rgba(40, 40, 40, 1.0);
   border: 2px;
   text-align: right;
-}
+  vertical-align:top;
 
-tr{
-  align-items: right;
 }
 
 session_title{
@@ -44,13 +45,11 @@ session_title{
   font-size: 120%;
   text-align: left;
   color:rgba(255, 255, 255, 0.8);
-  align-self: left;
-  align-content: left;
-  align-items: left;
 }
 
-session_info{
-  color:rgba(255, 255, 255, 1);
+.info{
+  float: right;
+  background-color: rgba(100, 100, 100, 0.01);
 }
 
 .center{
@@ -68,4 +67,16 @@ h3{
   float: left;
   width: fit-content;
   padding-right: 10px;
+}
+
+.session_row{
+  float: right;
+  align-content: right;
+}
+
+.cell{
+  background-color: rgba(100, 100, 100, 0.3);
+  padding: 30px;
+  padding-top: 20px;
+  width: 400px;
 }
