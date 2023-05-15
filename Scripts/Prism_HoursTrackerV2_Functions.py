@@ -169,11 +169,10 @@ class Prism_HoursTrackerV2_Functions(object):
         :param start_time: time when the asset was opened
         :return: dict 
         '''
-        
-        data = {
-            "days":[ self.initialise_day(date, entity, start_time)]
-        }
-        return data
+        try:
+            return {"days":[ self.initialise_day(date, entity, start_time)]}
+        except Exception as e:
+            self.log(traceback.format_exc())
     
     def initialise_day(self, date, entity, start_time):
         '''
@@ -184,7 +183,10 @@ class Prism_HoursTrackerV2_Functions(object):
         :param start_time: time when the asset was opened
         :return: dict 
         '''
-        return {"date": date, "projects": [self.initialise_project(entity, start_time)]}
+        try : 
+            return {"date": date, "projects": [self.initialise_project(entity, start_time)]}
+        except Exception as e:
+            self.log(traceback.format_exc())
     
     def initialise_project(self, entity, start_time):
         '''
@@ -245,18 +247,27 @@ class Prism_HoursTrackerV2_Functions(object):
     def get_date_as_datetime_obj(self, date_string):
         '''
         Converts a string object representing a date, like this %d/%m/%y, to a datetime object
+
+        :param date_string: string
         returns: datetime
         '''
         datetime_obj = datetime.strptime(date_string, '%d/%m/%y')
         return datetime_obj
 
     def get_time_as_datetime_obj(self, time_string):
-
+        '''
+        Converts a string object representing a date, like this %d/%m/%y, to a datetime object
+        
+        :param time_string: string
+        returns: datetime
+        '''
         return datetime.strptime(time_string,'%H:%M:%S')
 
     def get_date_as_string(self, datetime_obj):
         '''
         Converts datetime object to string format %d/%m/%y.
+
+        :param datetime_obj: datetime
         Returns: string
         '''
         date_string = datetime_obj.strftime('%d/%m/%y')
@@ -268,8 +279,9 @@ class Prism_HoursTrackerV2_Functions(object):
             Checks and converts if necessarey to datetime format before
             calculating delta
 
-            newest_date: str or datetime
-            oldest_date: str or datetime
+            :param newest_date: str or datetime
+            :param oldest_date: str or datetime
+            returns: timedelta
         """
         try:
             return newest_date - oldest_date
@@ -284,20 +296,27 @@ class Prism_HoursTrackerV2_Functions(object):
                 pass
 
             delta = timedelta(hours=newest_date.hour, minutes=newest_date.minute, seconds=newest_date.second) - timedelta(hours=oldest_date.hour, minutes=oldest_date.minute, seconds=oldest_date.second)
-            self.log(f"delta = {delta}")
             return  delta
 
     def is_new_week(self, data, week):
         """
+        Check if the current week is different from the week store in data
+
+        :param data: dict
+        :param week: int
+        :return: bool
         """
         last_week = data.get('week')
-        self.log(f'last week = {last_week}, week = {str(week)}')
         return last_week != str(week)
 
     def get_week_definition(self):
-        # Get the Monday and Wednesday dates for the given week number and year
-        today = datetime.now()
+        '''
+        Get the week definition of the current week
+        format monday %d/%m/%y - wednesday %d/%m/%y
 
+        :return: string
+        '''
+        today = datetime.now()
         day_of_week = today.weekday()
 
         to_beginning_of_week = timedelta(days=day_of_week)
@@ -312,6 +331,12 @@ class Prism_HoursTrackerV2_Functions(object):
         return f"{mon} - {wed}"
 
     def get_last_week_definition(self):
+        '''
+        Get the week definition of the last week
+        format monday %d/%m/%y - wednesday %d/%m/%y
+
+        :return: string
+        '''
         # Get the Monday and Wednesday dates for the given week number and year
         last_week = datetime.now() - timedelta(days=7)
 
@@ -334,14 +359,20 @@ class Prism_HoursTrackerV2_Functions(object):
     def get_username(self):
         '''
         Returns the user's name
+
+        :return: string
         '''
         try:
             return self.core.getConfig("globals", "username")
         except:
             return self.core.username
-
-    
+ 
     def get_entity(self):
+        '''
+        Get current file info and convert it to entity
+
+        :return: dict
+        '''
         try :
             file_name = self.core.getCurrentFileName()
             data = self.core.getScenefileData(file_name)
@@ -369,6 +400,8 @@ class Prism_HoursTrackerV2_Functions(object):
     def get_current_project(self):
         '''
         Returns the project's name
+
+        :return: string
         '''
         try:
             project_name = self.core.projectName
@@ -382,6 +415,12 @@ class Prism_HoursTrackerV2_Functions(object):
 #pragma region file
    
     def get_data(self, path):
+        '''
+        Read json data from a given path and return its data
+
+        :param path: string
+        :return: dict
+        '''
         path = str(path)
         try:
             # Open user json data and laod it to data
@@ -398,6 +437,9 @@ class Prism_HoursTrackerV2_Functions(object):
     def write_to_file(self, content, filename):
         '''
         Writes given content to the given filename.
+
+        :param content: dict
+        :param filename: string
         '''
         output_file = open(filename, 'w')
         output_file.write(content)
@@ -406,6 +448,10 @@ class Prism_HoursTrackerV2_Functions(object):
     def backup_data(self, week, year):
         """
         Copies the user's json data to a backup location
+        Fill json backups with new backup location
+
+        :param week: int
+        :param year: int
         """
         # last week and last year
         week = week-1
@@ -450,6 +496,13 @@ class Prism_HoursTrackerV2_Functions(object):
                 json_file.write('{}')
 
     def create_backup_info(self,week, year):
+        '''
+        Creates a backup info dict and return it
+
+        :param week: int
+        :param year: int
+        :return: dict
+        '''
         bkp = {
             "week": str(week),
             "year": str(year),
@@ -463,13 +516,26 @@ class Prism_HoursTrackerV2_Functions(object):
 #pragma region modify_data
 
     def update_last(self, data, entity):
+        '''
+        Updates the last active project and last opened asset in the data
+
+        :param data: dict
+        :param entity: dict
+        '''
         data['last_active_project'] = self.get_current_project()
         data['last_opened'] = entity.get('asset_name')
 
     def add_project(self, data, project):
+        '''
+        Append a project in the data in the last day
+
+        :param data: dict
+        :param project: dict
+        '''
+        
         data.get('days')[-1].get('projects').append(project)
 
-    def add_project_session(self, data, entity, session):
+    def add_project_session(self, data, session):
         projects = data.get('days')[-1].get('projects')
         for p in projects:
             if p.get('project_name') == self.get_current_project():
@@ -584,7 +650,7 @@ class Prism_HoursTrackerV2_Functions(object):
                 # Does the current entity have a project_session if not initialise it
                 elif not self.is_project_session_exist(data, entity):
                     session = self.initialise_project_sessions(entity, start_time)
-                    self.add_project_session(data, entity, session)
+                    self.add_project_session(data, session)
                     self.update_last(data, entity)
 
                 # TODO : else, add sesssion
