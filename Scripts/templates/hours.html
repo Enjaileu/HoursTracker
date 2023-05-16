@@ -62,7 +62,8 @@
                 // week
                 week_nb = json_data['week'];
                 year = json_data['year'];
-                text = "Here is the summary of your work for week " + week_nb + " of " + year + ".";
+                des = json_data['week_description']
+                text = "Here is the summary of your work for week " + week_nb + " of " + year + " (" + des +").";
                 document.getElementById("week").innerHTML = text;
 
                 // containers
@@ -149,7 +150,8 @@
             for(var i = 0; i < json_data.backups.length; i++){
                 // get data
                 bckp = json_data.backups[i]
-                var opText = bckp.year + " Week " + bckp.week
+                //var opText = bckp.year + " Week " + bckp.week
+                var opText = bckp.week_description
                 var opValue = bckp.path
 
                 // add option

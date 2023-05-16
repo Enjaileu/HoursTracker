@@ -42,6 +42,7 @@ import shutil
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
+import threading
 
 try:
     from PySide2.QtCore import *
@@ -102,6 +103,7 @@ class Prism_HoursTrackerV2_Functions(object):
         self.user_list_backup_json =  self.user_data_dir + 'backups.json'
         self.user_list_backup_js =  self.user_data_dir + 'backups.js'
         self.user_log = self.user_data_dir + 'log.txt'
+        self.user_last_json = self.user_data_dir + 'last.json'
 
         
         if not os.path.exists(self.user_log):
@@ -124,10 +126,13 @@ class Prism_HoursTrackerV2_Functions(object):
             with open(self.user_data_json, 'a') as json_file:
                 json_file.write('{}')
 
+        if not os.path.exists(self.user_last_json):
+            with open(self.user_last_json, 'a') as json_file:
+                json_file.write('{}')
+
         if not os.path.exists(self.user_data_js):
             open(self.user_data_js, 'a').close()
         
-
         if not os.path.exists(self.user_data_html):
             src = 'R:/Prism/Plugins/{version}/HoursTracker/Scripts/templates/hours.html'.format(version=version)
             dst = self.user_data_html
@@ -144,8 +149,6 @@ class Prism_HoursTrackerV2_Functions(object):
         return True
 
 # UTILITY FUNCTIONS
-
- 
     def is_disk_allowed(self, path):
         '''
         return if the is on a disk allowed by the plugin
@@ -377,7 +380,6 @@ class Prism_HoursTrackerV2_Functions(object):
             file_name = self.core.getCurrentFileName()
             data = self.core.getScenefileData(file_name)
             if data == {}:
-                self.log('no data linked to this asset')
                 return {}
             else:
                 entity = {
@@ -388,7 +390,7 @@ class Prism_HoursTrackerV2_Functions(object):
                 }
 
                 if entity.get('asset_type') == 'shot':
-                    entity['asset_name'] = f"{data.get('sequence')}_{data.get('shot')}"
+                    entity['asset_name'] = f"{data.get('sequence')}{data.get('shot')}"
                 else:
                     entity['asset_name'] = data.get('asset')
 
@@ -410,6 +412,21 @@ class Prism_HoursTrackerV2_Functions(object):
             project_name = os.path.basename(os.path.dirname(os.path.dirname(project_path)))
 
         return project_name
+
+    def is_same_asset(self, entity):
+        '''
+        Return if the asset store in last.json is the same as the entity
+
+        :param entity: dict
+        :return: bool
+        '''
+        try:
+            last = self.get_data(self.user_last_json)
+            return last['last_active_project'] == entity.get('project_name') and last['last_opened'] == entity.get('asset_name') and last["last_department"] == entity.get('department')
+        except Exception as e:
+            self.log(traceback.format_exc())
+            return False
+
 #pragma endregion entity
 
 #pragma region file
@@ -515,15 +532,16 @@ class Prism_HoursTrackerV2_Functions(object):
 
 #pragma region modify_data
 
-    def update_last(self, data, entity):
+    def update_last(self, data_last, entity):
         '''
         Updates the last active project and last opened asset in the data
 
-        :param data: dict
+        :param data_last: dict
         :param entity: dict
         '''
-        data['last_active_project'] = self.get_current_project()
-        data['last_opened'] = entity.get('asset_name')
+        data_last['last_active_project'] = self.get_current_project()
+        data_last['last_opened'] = entity.get('asset_name')
+        data_last['last_department'] = entity.get('department')
 
     def add_project(self, data, project):
         '''
@@ -532,16 +550,28 @@ class Prism_HoursTrackerV2_Functions(object):
         :param data: dict
         :param project: dict
         '''
-        
         data.get('days')[-1].get('projects').append(project)
 
     def add_project_session(self, data, session):
+        '''
+        Append a project session in the data in the right project
+
+        :param data: dict
+        :param session: dict
+        '''
         projects = data.get('days')[-1].get('projects')
         for p in projects:
             if p.get('project_name') == self.get_current_project():
                 p.get('project_sessions').append(session)
     
     def add_asset_session(self, data, entity, session):
+        '''
+        Append an asset session in the data in the right project session
+
+        :param data: dict
+        :param entity: dict
+        :param session: dict
+        '''
         projects = data.get('days')[-1].get('projects')
         for p in projects:
             if p.get('project_name') == self.get_current_project():
@@ -549,11 +579,17 @@ class Prism_HoursTrackerV2_Functions(object):
                 for ps in project_sessions:
                     if ps.get('asset_name') == entity.get('asset_name') and ps.get('department') == entity.get('department'):
                         ps.get('asset_sessions').append(session)
-                        self.log('asset session added')
 #pragme enregion modify_data
 
 #pragma region check_data
     def does_day_exist(self, data, date):
+        '''
+        Checks if the given date exists in the data
+
+        :param data: dict
+        :param date: string
+        :return: bool
+        '''
         try:
             for d in data.get('days'):
                 if d.get('date') == date:
@@ -562,6 +598,12 @@ class Prism_HoursTrackerV2_Functions(object):
                 self.log(traceback.format_exc())    
 
     def does_project_exist(self, data):
+        '''
+        Checks if the given project exists in the data
+
+        :param data: dict
+        :return: bool
+        '''
         try:
             project = self.get_current_project()
             projects = data.get('days')[-1].get('projects')
@@ -573,9 +615,16 @@ class Prism_HoursTrackerV2_Functions(object):
                 self.log(traceback.format_exc())
 
     def is_project_session_exist(self, data, entity):
+        '''
+        Checks if the given project session exists in the data
+
+        :param data: dict
+        :param entity: dict
+        :return: bool
+        '''
         projects = data.get('days')[-1].get('projects')
         for p in projects:
-            if p.get('project_name') == self.get_current_project()
+            if p.get('project_name') == self.get_current_project():
                 sessions = p.get('project_sessions')
                 for s in sessions:
                     if s.get('asset_name') == entity.get('asset_name') and s.get('department') == entity.get('department'):
@@ -596,11 +645,7 @@ class Prism_HoursTrackerV2_Functions(object):
 # LOGIC
     def create_data(self, entity={}):
         """
-        Function that runs everytime a callback is called in Prism. The logic happens here.
-        Retrieves user date from file
-        Creates data relevant to the scene opening action: user, date, time
-        Runs a series of checks on existing data to determine where to write the action's data
-        Writes the action's data
+        
         """
         if 'noUI' not in self.core.prismArgs:
             try:
@@ -620,6 +665,12 @@ class Prism_HoursTrackerV2_Functions(object):
                 except:
                     # If json file empty return empty dict/json object
                     data = {}
+                
+                # Get data_last from file
+                try:
+                    data_last = self.get_data(self.user_last_json)
+                except:
+                    data_last = {}
 
                 
                 # If data is empty initialise it
@@ -638,28 +689,28 @@ class Prism_HoursTrackerV2_Functions(object):
                 elif not self.does_day_exist(data, date):
                     new_day = self.initialise_day(date, entity, start_time)
                     data.get('days').append(new_day)
-                    self.update_last(data, entity)
+                    self.update_last(data_last, entity)
                     
 
                 # Does the current project exist for today date, if not initialise it
                 elif not self.does_project_exist(data):
                     project = self.initialise_project(entity, start_time)
                     self.add_project(data, project)
-                    self.update_last(data, entity)
+                    self.update_last(data_last, entity)
 
                 # Does the current entity have a project_session if not initialise it
                 elif not self.is_project_session_exist(data, entity):
                     session = self.initialise_project_sessions(entity, start_time)
                     self.add_project_session(data, session)
-                    self.update_last(data, entity)
+                    self.update_last(data_last, entity)
 
                 # TODO : else, add sesssion
                 else: 
                     session = self.initialise_asset_session(start_time)
                     self.add_asset_session(data, entity, session)
                 
-                # Set last active project and set last file opened
-                self.update_last(data, entity)
+                # Set last active project and set last file opened etc
+                self.update_last(data_last, entity)
 
                 # Set last datas
                 data['user_id'] = user
@@ -674,6 +725,9 @@ class Prism_HoursTrackerV2_Functions(object):
 
                 json_obj = json.dumps(data, indent=4)
                 self.write_to_file(json_obj, self.user_data_json)
+
+                json_last_obj = json.dumps(data_last, indent=4)
+                self.write_to_file(json_last_obj, self.user_last_json)
                 
                 
             except Exception as e:
@@ -683,70 +737,78 @@ class Prism_HoursTrackerV2_Functions(object):
 
     def update_data(self, entity):
 
-        now = datetime.now()
-        date = now.strftime('%d/%m/%y')
+        if 'noUI' not in self.core.prismArgs:
 
-    # Get data from file
-        try:
-            # Open user json data and laod it to data
-            data = self.get_data(self.user_data_json)
-        except:
-            # If json file empty return empty dict/json object
-            self.log('data doesnt exist')
-            self.create_data(entity)
+            now = datetime.now()
+            date = now.strftime('%d/%m/%y')
 
+            # Get data from file
+            try:
+                # Open user json data and laod it to data
+                data = self.get_data(self.user_data_json)
+            except:
+                # If json file empty return empty dict/json object
+                self.create_data(entity)
 
-        try:
-            # update session
-            days = data.get('days')
+            try:
 
-            for d in days:
-                if d.get('date') ==  date:
-                    project = self.get_current_project()
-                    projects = d.get('projects')
-                    for p in projects:
-                        if p.get('project_name') == project:
-                            project_sessions = p.get('project_sessions')
-                            for ps in project_sessions:
-                                total_time = timedelta(seconds=0)
+                # verify if still the same asset
+                if self.is_same_asset(entity):
 
-                                asset_name = ps.get('asset_name')
-                                department = ps.get('department')
-                                if asset_name == entity.get('asset_name') and department == entity.get('department'):
-                                    sessions = ps.get('asset_sessions')
+                    # update session
+                    days = data.get('days')
 
-                                    # update last action time
-                                    sessions[-1]['last_action_time'] = now.strftime('%H:%M:%S')
-                                    # update total_time session
-                                    delta = self.get_date_delta(now, sessions[-1].get('start_time'))
-                                    sessions[-1]['total_time'] = str(delta)
-                                
-                                    # update total_time project session
-                                    for s in sessions:
-                                        tt = self.get_time_as_datetime_obj(s.get('total_time'))
-                                        delta_tt = timedelta(hours=tt.hour, minutes=tt.minute, seconds=tt.second)
-                                        total_time += delta_tt
-                                    ps['total_time'] = str(total_time)
+                    for d in days:
+                        if d.get('date') ==  date:
+                            project = self.get_current_project()
+                            projects = d.get('projects')
+                            for p in projects:
+                                if p.get('project_name') == project:
+                                    project_sessions = p.get('project_sessions')
+                                    for ps in project_sessions:
+                                        total_time = timedelta(seconds=0)
 
-                                    self.log('session updated')
-                                    break
+                                        asset_name = ps.get('asset_name')
+                                        department = ps.get('department')
+                                        if asset_name == entity.get('asset_name') and department == entity.get('department'):
+                                            sessions = ps.get('asset_sessions')
 
-            self.log(str(data))
-            # Write data to file
-            js_obj = json.dumps(data)
-            content = "var data = '{}'".format(js_obj)
-            self.write_to_file(content, self.user_data_js)
+                                            # update last action time
+                                            sessions[-1]['last_action_time'] = now.strftime('%H:%M:%S')
+                                            # update total_time session
+                                            delta = self.get_date_delta(now, sessions[-1].get('start_time'))
+                                            sessions[-1]['total_time'] = str(delta)
+                                        
+                                            # update total_time project session
+                                            for s in sessions:
+                                                tt = self.get_time_as_datetime_obj(s.get('total_time'))
+                                                delta_tt = timedelta(hours=tt.hour, minutes=tt.minute, seconds=tt.second)
+                                                total_time += delta_tt
+                                            ps['total_time'] = str(total_time)
 
-            json_obj = json.dumps(data, indent=4)
-            self.write_to_file(json_obj, self.user_data_json)
+                                            self.log('session updated')
+                                            break
 
-        except Exception as e:
-            self.log(traceback.format_exc())
+                    # Write data to file
+                    js_obj = json.dumps(data)
+                    content = "var data = '{}'".format(js_obj)
+                    self.write_to_file(content, self.user_data_js)
 
-        self.log('done update')
+                    json_obj = json.dumps(data, indent=4)
+                    self.write_to_file(json_obj, self.user_data_json)
+
+                else:
+                    self.create_data(entity)
+
+            except Exception as e:
+                self.log(traceback.format_exc())
+
+            self.log('done update')
+
+    def message_timer(self):
+        self.log("timer waited")
 
          
-
 # CALLBACKS
     '''
     To add new callbacks:
@@ -755,11 +817,20 @@ class Prism_HoursTrackerV2_Functions(object):
     3. Check in the Prism source code if the callback accepts *args and/or **kwargs (to avoid Prism Errors that can't be caught)
     '''
     def onSceneOpen(self, *args):
-        self.log("scene saved")
+        self.log("scene opened")
         if args[0] and self.is_disk_allowed(args[0]):
             entity = self.get_entity()
             if entity:
+                #waited_thread = threading.Thread(target=self.timer, args=(60,))
+                #waited_thread.start()
+
+                self.log('timer started')
+                waited_time = threading.Timer(60, self.message_timer)
+                waited_time.start()
+
                 self.create_data(entity)
+                #waited_thread.join()
+
             else:   
                 self.log(f"entity empty")
             
