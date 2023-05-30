@@ -64,6 +64,7 @@ class Prism_HoursTrackerV2_Functions(object):
         version = self.core.version.split('.', 3)[-1]
 
         # Register callback functions
+        # TODO: verify wich callback is must be implement
         self.core.callbacks.registerCallback(
             "onSceneOpen", self.onSceneOpen, plugin=self)
         self.core.callbacks.registerCallback(
@@ -73,23 +74,9 @@ class Prism_HoursTrackerV2_Functions(object):
         self.core.callbacks.registerCallback(
             "onStateManagerClose", self.onStateManagerClose, plugin=self)
         self.core.callbacks.registerCallback(
-            "onStateDeleted", self.onStateDeleted, plugin=self)
-        self.core.callbacks.registerCallback(
-            "onStateCreated", self.onStateCreated, plugin=self)
-        self.core.callbacks.registerCallback(
             "onPublish", self.onPublish, plugin=self)
         self.core.callbacks.registerCallback(
             "postPublish", self.postPublish, plugin=self)
-        self.core.callbacks.registerCallback(
-            "onProductCreated", self.onProductCreated, plugin=self)
-        self.core.callbacks.registerCallback(
-            "onAssetCreated", self.onAssetCreated, plugin=self)
-        self.core.callbacks.registerCallback(
-            "onShotCreated", self.onShotCreated, plugin=self)
-        self.core.callbacks.registerCallback(
-            "onDepartmentCreated", self.onDepartmentCreated, plugin=self)
-        self.core.callbacks.registerCallback(
-            "onTaskCreated", self.onTaskCreated, plugin=self)
         self.core.callbacks.registerCallback(
             "postExport", self.postExport, plugin=self)
 
@@ -143,6 +130,9 @@ class Prism_HoursTrackerV2_Functions(object):
             dst = self.user_data_css
             shutil.copy(src, dst)
 
+        # create thread dedicated to timer
+        self.t_timer = None
+
     # if returns true, the plugin will be loaded by Prism
     @err_catcher(name=__name__)
     def isActive(self):
@@ -156,10 +146,8 @@ class Prism_HoursTrackerV2_Functions(object):
         :param path: path of the file
         :return: bool
         '''
-        
-        if path[0] == 'C':
-            return False
-        return True
+        not_allowed = ["C", "T"]
+        return path[0] not in not_allowed
 
 #pragma region initialise
 
@@ -249,7 +237,7 @@ class Prism_HoursTrackerV2_Functions(object):
 
     def get_date_as_datetime_obj(self, date_string):
         '''
-        Converts a string object representing a date, like this %d/%m/%y, to a datetime object
+        Converts a string object representing a date, like this %d/%m/%y to a datetime object
 
         :param date_string: string
         returns: datetime
@@ -259,7 +247,7 @@ class Prism_HoursTrackerV2_Functions(object):
 
     def get_time_as_datetime_obj(self, time_string):
         '''
-        Converts a string object representing a date, like this %d/%m/%y, to a datetime object
+        Converts a string object representing a date, like this '%H:%M:%S' or this to a datetime object
         
         :param time_string: string
         returns: datetime
@@ -426,7 +414,6 @@ class Prism_HoursTrackerV2_Functions(object):
         except Exception as e:
             self.log(traceback.format_exc())
             return False
-
 #pragma endregion entity
 
 #pragma region file
@@ -442,7 +429,10 @@ class Prism_HoursTrackerV2_Functions(object):
         try:
             # Open user json data and laod it to data
             with open(path, 'r') as json_file:
-                raw_data = json_file.read()
+                try:
+                    raw_data = json_file.read()
+                except Exception as e:
+                    self.log(traceback.format_exc())
                 data = json.loads(raw_data)
         except Exception as e:
             self.log(traceback.format_exc())
@@ -542,6 +532,7 @@ class Prism_HoursTrackerV2_Functions(object):
         data_last['last_active_project'] = self.get_current_project()
         data_last['last_opened'] = entity.get('asset_name')
         data_last['last_department'] = entity.get('department')
+        data_last['last_time'] = datetime.now().strftime('%H:%M:%S')
 
     def add_project(self, data, project):
         '''
@@ -633,6 +624,60 @@ class Prism_HoursTrackerV2_Functions(object):
         return False
 #pragma endregion check_data
 
+#pragma region timer
+    def timer_finished(self):
+        '''
+        Reset last opened asset
+        Write in last.json
+        '''
+        self.log('timer finished!')
+        data_last ={
+        "last_active_project": "",
+        "last_opened": "",
+        "last_department": "",
+        "last_time": ""
+        }
+        
+        json_obj = json.dumps(data_last, indent=4)
+        self.write_to_file(json_obj, self.user_last_json)
+        
+    def is_timer_running(self):
+        '''
+        Return if the timer is running
+
+        :return: bool
+        '''
+        return self.t_timer and self.t_timer.is_alive()
+
+    def run_timer(self):
+        '''
+        Initialise new timer
+        start timer
+        '''
+        self.log('timer run')
+        self.t_timer = threading.Timer(120, self.timer_finished)
+        self.t_timer.start()
+    
+    def cancel_timer(self):
+        '''
+        Cancel the timer
+        Wait for it to finish task 
+        '''
+        self.log('timer cancel')
+        if self.t_timer:
+            self.t_timer.cancel()
+            self.t_timer.join()
+
+    def reset_timer(self):
+        '''
+        Reset the timer
+        If it is already running, cancel it before
+        Then run the timer 
+        '''
+        if self.is_timer_running():
+            self.cancel_timer()
+        self.run_timer()
+#pragma endregion timer
     
     def log(self, error_message):
         date = datetime.now().strftime('%d/%m/%y')
@@ -645,7 +690,10 @@ class Prism_HoursTrackerV2_Functions(object):
 # LOGIC
     def create_data(self, entity={}):
         """
-        
+        Initialise data that goes in hours.json and hours.js
+        Write all the data in the files
+
+        :param entity: dict
         """
         if 'noUI' not in self.core.prismArgs:
             try:
@@ -733,9 +781,17 @@ class Prism_HoursTrackerV2_Functions(object):
             except Exception as e:
                 self.log(traceback.format_exc())
 
-            self.log('done')
+            self.log('done create data')
 
     def update_data(self, entity):
+        '''
+        Get data from hours.js and last.json
+        If current asset is not last opened asset : create new data
+        Change data according the entity currently open
+        Write in hours.json, hours.js, last.json and last.js
+
+        :param entity: dict
+        '''
 
         if 'noUI' not in self.core.prismArgs:
 
@@ -785,8 +841,6 @@ class Prism_HoursTrackerV2_Functions(object):
                                                 delta_tt = timedelta(hours=tt.hour, minutes=tt.minute, seconds=tt.second)
                                                 total_time += delta_tt
                                             ps['total_time'] = str(total_time)
-
-                                            self.log('session updated')
                                             break
 
                     # Write data to file
@@ -805,9 +859,6 @@ class Prism_HoursTrackerV2_Functions(object):
 
             self.log('done update')
 
-    def message_timer(self):
-        self.log("timer waited")
-
          
 # CALLBACKS
     '''
@@ -821,15 +872,8 @@ class Prism_HoursTrackerV2_Functions(object):
         if args[0] and self.is_disk_allowed(args[0]):
             entity = self.get_entity()
             if entity:
-                #waited_thread = threading.Thread(target=self.timer, args=(60,))
-                #waited_thread.start()
-
-                self.log('timer started')
-                waited_time = threading.Timer(60, self.message_timer)
-                waited_time.start()
-
+                #self.reset_timer()
                 self.create_data(entity)
-                #waited_thread.join()
 
             else:   
                 self.log(f"entity empty")
@@ -838,14 +882,16 @@ class Prism_HoursTrackerV2_Functions(object):
         self.log("scene saved")
         entity = self.get_entity()
         if entity:
+            #self.reset_timer()
             self.update_data(entity)
         else:            
             self.log(f"entity empty")
 
-    def onStateManagerShow(self, *args):
+    def onStateManagerShow(self, *args, **kwargs):
         self.log("state manager opened")
         entity = self.get_entity()
         if entity:
+            #self.reset_timer()
             self.update_data(entity)
         else:            
             self.log(f"entity empty")
@@ -854,22 +900,7 @@ class Prism_HoursTrackerV2_Functions(object):
         self.log("state manager closed")
         entity = self.get_entity()
         if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onStateDeleted(self, *args):
-        self.log("state deleted")
-        entity = self.get_entity()
-        if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onStateCreated(self, *args, **kwargs):
-        self.log("state created")
-        entity = self.get_entity()
-        if entity:
+            #self.reset_timer()
             self.update_data(entity)
         else:            
             self.log(f"entity empty")
@@ -878,6 +909,7 @@ class Prism_HoursTrackerV2_Functions(object):
         self.log("on publish")
         entity = self.get_entity()
         if entity:
+            #self.reset_timer()
             self.update_data(entity)
         else:            
             self.log(f"entity empty")
@@ -886,46 +918,7 @@ class Prism_HoursTrackerV2_Functions(object):
         self.log("post_published")
         entity = self.get_entity()
         if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onProductCreated(self, *args):
-        self.log("product created")
-        entity = self.get_entity()
-        if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onAssetCreated(self, *args):
-        self.log("asset created")
-        entity = self.get_entity()
-        if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onShotCreated(self, *args):
-        self.log("shot created")
-        entity = self.get_entity()
-        if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onDepartmentCreated(self, *args):
-        self.log("department created")
-        entity = self.get_entity()
-        if entity:
-            self.update_data(entity)
-        else:            
-            self.log(f"entity empty")
-
-    def onTaskCreated(self, *args):        
-        self.log("task created")
-        entity = self.get_entity()
-        if entity:
+            #self.reset_timer()
             self.update_data(entity)
         else:            
             self.log(f"entity empty")
@@ -934,6 +927,7 @@ class Prism_HoursTrackerV2_Functions(object):
         self.log("post export")
         entity = self.get_entity()
         if entity:
+            #self.reset_timer()
             self.update_data(entity)
         else:            
             self.log(f"entity empty")
