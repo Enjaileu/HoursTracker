@@ -30,9 +30,15 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Prism.  If not, see <https://www.gnu.org/licenses/>.
 
+'''
+authors:
+Elise Vidal - evidal@artfx.fr
+Angele Sionneau - asionneau@artfx.fr
+'''
+
 class Prism_HoursTrackerV2_Variables(object):
     def __init__(self, core, plugin):
-        self.version = "v2.0.0.beta2"
+        self.version = "v2.1.0.beta2"
         self.pluginName = "HoursTrackerV2"
         self.pluginType = "Custom"
         self.platforms = ["Windows", "Linux", "Darwin"]

@@ -30,12 +30,22 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Prism.  If not, see <https://www.gnu.org/licenses/>.
 
+'''
+authors:
+Elise Vidal - evidal@artfx.fr
+Angele Sionneau - asionneau@artfx.fr
+'''
+
+# include plugin's scripts path in sys.path
+import sys
+import os
+sys.path.append(f"{os.path.dirname(os.path.abspath(__file__))}\\utils")
 
 from Prism_HoursTrackerV2_Variables import Prism_HoursTrackerV2_Variables
 from Prism_HoursTrackerV2_Functions import Prism_HoursTrackerV2_Functions
 
 class Prism_HoursTrackerV2(Prism_HoursTrackerV2_Variables, Prism_HoursTrackerV2_Functions):
     def __init__(self, core):
+
         Prism_HoursTrackerV2_Variables.__init__(self, core, self)
         Prism_HoursTrackerV2_Functions.__init__(self, core, self)
-
