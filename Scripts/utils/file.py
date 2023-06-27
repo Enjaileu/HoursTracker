@@ -27,6 +27,7 @@ def get_data(path):
             except Exception as e:
                 log(traceback.format_exc())
                 log(e)
+            log(f"raw_data = {raw_data}")
             data = json.loads(raw_data)
     except Exception as e:
         log(traceback.format_exc())
