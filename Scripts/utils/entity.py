@@ -84,37 +84,4 @@ def is_same_asset(current, last):
         mhfx_log.log(traceback.format_exc())
         return False
     
-def does_project_exist(data, core):
-    '''
-    Checks if the given project exists in the data
 
-    :param data: dict
-    :return: bool
-    '''
-    try:
-        project = get_current_project(core)
-        projects = data.get('days')[-1].get('projects')
-        for p in projects:
-            if p.get('project_name') == project:
-                return True
-
-    except Exception as e:
-        mhfx_log.log(traceback.format_exc())
-
-def is_project_session_exist(data, entity, core):
-    '''
-    Checks if the given project session exists in the data
-
-    :param data: dict
-    :param entity: dict
-    :return: bool
-    '''
-    projects = data.get('days')[-1].get('projects')
-    for p in projects:
-        if p.get('project_name') == get_current_project(core):
-            sessions = p.get('project_sessions')
-            for s in sessions:
-                if s.get('asset_name') == entity.get('asset_name') and s.get('department') == entity.get('department'):
-                    return True
-    
-    return False

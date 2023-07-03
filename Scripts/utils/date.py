@@ -68,6 +68,8 @@ def is_new_week(data, week):
     :param week: int
     :return: bool
     """
+    if data == {}:
+        return False
     last_week = data.get('week')
     return last_week != str(week)
 

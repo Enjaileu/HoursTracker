@@ -3,13 +3,14 @@ authors:
 Elise Vidal - evidal@artfx.fr
 Angele Sionneau - asionneau@artfx.fr
 '''
-
+import os
 import traceback
 import json
 import shutil
 
 from mhfx_log import log
 from config import mhfx_path
+from datetime import datetime
 
 def get_data(path):
     '''
@@ -26,12 +27,11 @@ def get_data(path):
                 raw_data = json_file.read()
             except Exception as e:
                 log(traceback.format_exc())
-                log(e)
-            log(f"raw_data = {raw_data}")
+                log(str(e))
             data = json.loads(raw_data)
     except Exception as e:
         log(traceback.format_exc())
-        log(e)
+        log(str(e))
         # If json file empty return empty dict/json object
         data = {}
     
@@ -53,8 +53,7 @@ def backup_data(data):
     Copies the user's json data to a backup location
     Fill json backups with new backup location
 
-    :param week: int
-    :param year: int
+    :param data: dict, data to backup
     """
     # last week and last year
     week = data.get('week')
@@ -92,10 +91,18 @@ def backup_data(data):
 
 def reset_user_data():
     """
-    Resets the json file containing the user's data
+    Resets the json, js, and txt files containing the user's data
     """
-    with open(mhfx_path.user_data_json, 'a') as json_file:
-            json_file.write('{}')
+    file_paths = [mhfx_path.user_data_json, mhfx_path.user_data_js, mhfx_path.user_log]
+
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        with open(file_path, 'w') as file:
+            if file_path.endswith('.json'):
+                file.write("{}")
+            else:
+                file.write('')
 
 def create_backup_info(week, year, week_definition):
     '''
