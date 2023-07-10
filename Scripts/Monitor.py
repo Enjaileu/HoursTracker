@@ -49,7 +49,6 @@ class Monitor(object):
             self.is_running = False
         except Exception as e:
             log(traceback.format_exc())
-            log(str(e))
     
     def add_process(self, filename: Path, executable: str):
         '''
@@ -126,6 +125,7 @@ class Monitor(object):
                                 log('!!!!!!!!!!!!! all the proc are closed !!!!!!!!!!!!!')
                             self.stop_thread()
                             push_processes({})
+                    
                     else:
                         # get current window
                         wndw = get_current_window()

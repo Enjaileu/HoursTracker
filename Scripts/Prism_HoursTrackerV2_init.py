@@ -38,7 +38,9 @@ Angele Sionneau - asionneau@artfx.fr
 
 # include mhfx python libraries
 import sys
-sys.path.append('R:/Python/tiers')
+import os
+for path in os.environ['PYTHONPATH'].split(';'):
+    sys.path.append(path)
 
 from Prism_HoursTrackerV2_Variables import Prism_HoursTrackerV2_Variables
 from Prism_HoursTrackerV2_Functions import Prism_HoursTrackerV2_Functions

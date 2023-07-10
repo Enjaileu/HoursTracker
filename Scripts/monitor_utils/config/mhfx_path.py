@@ -21,3 +21,4 @@ user_config = user_data_dir + 'config.ini'
 
 # template to get file properties according to the pipe
 file_template = "{letter}/{project_name}/03_Production/{asset_type}/{asset_subtype}/{asset_name}/Scenefiles/{department}/{task}/{file}.{ext}"
+file_template_bonus = "{letter}/{project_name}/03_Production/{asset_type}/{asset_name}/Scenefiles/{department}/{task}/{file}.{ext}"
