@@ -5,12 +5,10 @@
 # Contact :  asionneau@artfx.fr
 
 import os
-import json
 import shutil
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-import threading
 
 try:
     from PySide2.QtCore import *
@@ -22,28 +20,26 @@ except:
 
 from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 
-from utils.config import mhfx_path, mhfx_disk, monitor
-import utils.entity as ntt
-from utils.mhfx_log import log
-import utils.date as dt
-import utils.data_management as dm
-import utils.data_initialise as di
-import utils.file as file
+from monitor_utils.config import mhfx_path, mhfx_exe, monitor
+from monitor_utils.mhfx_log import log
+import monitor_utils.file as file
 from Monitor import Monitor
-from Process import Process
-from utils.windows import get_pid_by_process_name
-
 
 class Prism_HoursTrackerV2_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
-        self.version = self.core.version.split('.', 3)[-1]
+        # TODO : change
+        #self.version = self.core.version.split('.', 3)[-1]
+        self.prism_version = f"{self.core.version.split('.', 3)[-1]}.test"
 
         try:
             # Verify and create filepath
             if not os.path.exists(mhfx_path.user_data_dir):
                 os.makedirs(mhfx_path.user_data_dir)
+
+            if not os.path.exists(mhfx_path.user_tmp_dir):
+                os.makedirs(mhfx_path.user_tmp_dir)
             
             if not os.path.exists(mhfx_path.user_log):
                 open(mhfx_path.user_log, 'a').close()
@@ -68,89 +64,115 @@ class Prism_HoursTrackerV2_Functions(object):
             if not os.path.exists(mhfx_path.user_data_js):
                 open(mhfx_path.user_data_js, 'a').close()
             
+            if not os.path.exists(mhfx_path.user_config):
+                src = f'R:/Prism/Plugins/{self.prism_version}/HoursTrackerV2/Scripts/templates/config.ini'
+                dst = mhfx_path.user_config
+                shutil.copy(src, dst)
+            
             if not os.path.exists(mhfx_path.user_data_html):
-                src = f'R:/Prism/Plugins/{self.version}/HoursTracker/Scripts/templates/hours.html'
+                src = f'R:/Prism/Plugins/{self.prism_version}/HoursTrackerV2/Scripts/templates/hours.html'
                 dst = mhfx_path.user_data_html
                 shutil.copy(src, dst)
 
             if not os.path.exists(mhfx_path.user_data_css):
-                src = f'R:/Prism/Plugins/{self.version}/HoursTracker/Scripts/templates/style.css'
+                src = f'R:/Prism/Plugins/{self.prism_version}/HoursTrackerV2/Scripts/templates/style.css'
                 dst = mhfx_path.user_data_css
                 shutil.copy(src, dst)
 
+            if not os.path.exists(mhfx_path.user_tmp_processes):
+                with open(mhfx_path.user_tmp_processes, 'a') as json_file:
+                    json_file.write('{}')
+
+            # Initialise Monitor
+            self.monitor = Monitor()
+
+            # replace function openFile
+            self.core.plugins.monkeyPatch(self.core.openFile, self.openFile, self, force=True)
+            self.core.plugins.monkeyPatch( self.core.appPlugin.openScene, self.plugin_openScene, self, force=True)
+
+            # callback
+            self.core.callbacks.registerCallback("onFileOpen", self.onFileOpen, plugin=self)
+
         except Exception as e:
             log(traceback.format_exc())
-            log(str(e))
-
-
-        # Initialise Monitor
-        self.monitor = Monitor()
-
-        self.thread = threading.Thread(target=self.monitor.run)
-
-        # replace function openFile
-        self.core.plugins.monkeyPatch(self.core.openFile, self.openFile, self, force=True)
-        self.core.plugins.monkeyPatch( self.core.appPlugin.openScene, self.plugin_openScene, self, force=True)
-
-        # callback
-        self.core.callbacks.registerCallback("onFileOpen", self.onFileOpen, plugin=self)
 
 
     # if returns true, the plugin will be loaded by Prism
     @err_catcher(name=__name__)
     def isActive(self):
         return True
+    
 # MONKEY PATCH
     def openFile(self, filepath):
-        log(f"open file {filepath}")
+        '''
+        Override function self.core.openFile.
+        Use the overriden function then add callback "onFileOpen"
+        '''
         self.core.plugins.callUnpatchedFunction(self.core.openFile, filepath)
         self.core.callback(name="onFileOpen", args=[filepath])
 
     def plugin_openScene(self, *args):
-        log(f"open from plugin file {args[1]}")
-        log(f"args = {args}")
+        '''
+        Ovveride function self.core.appPlugin.openScene.
+        Use the overriden function then add callback "onFileOpen".
+        '''
         self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=args[0], filepath=args[1])
         self.core.callback(name="onFileOpen", args=[args[1]])
 
+# FUNCTION
+    def is_new_week(self, data, week):
+        """
+        Check if the current week is different from the week store in data
+
+        :param data: dict
+        :param week: int
+        :return: bool
+        """
+        if data == {}:
+            return False
+        last_week = data.get('week')
+        return last_week != str(week)
+
 # CALLBACK
-    
     def onFileOpen(self, *args):
+        '''
+        Executed when the callback "onFileOpen" is called.
+        Get the filepath openend and if allowed software, add it as process to monitor.
+
+        :param args: list, args[0] = filepath
+        '''
+
         filepath = args[0]
-        log(f"FILEPATH GIVEN : {filepath}")
+        if monitor.debug_mode:
+            log(f"Prism open file : {filepath}")
         try:
             data = file.get_data(mhfx_path.user_data_json)
             now = datetime.now()
             week = now.isocalendar()[1]
             # Check if it's a new week, archive and reset data if it is
-            if dt.is_new_week(data, week) is True:
+            if self.is_new_week(data, week) is True:
                 file.backup_data(data)
                 file.reset_user_data()
 
-            # get ext, exe and pid
+            # get extension and executable
             filepath = Path(filepath)
             ext = filepath.suffix
             exe = []
-            for extension in monitor.executables.keys():
-                if extension == ext:
-                    exe = monitor.executables.get(extension)
-                    break
+            if ext in mhfx_exe.executables.keys():
+                exe = mhfx_exe.executables.get(ext)
             
+            # Add process if a executable is found
             if len(exe) <= 0:
                 log(f"soft with this ext : {ext} is not in config")
-                log(f"if this extension is a ddc extension, please add it in config.")
+                if monitor.debug_mode:
+                    log(f"if this extension is a ddc extension, please add it in mhfx_utils.config.mhfx_exe.py")
             else:
-                pid = get_pid_by_process_name(exe)
-            
                 # Add process to monitor
-                self.monitor.add_process(filepath, exe, pid)
-                log(f"open this file : {filepath}, in this executable : {str(exe)}, with this pid {pid}")
+                self.monitor.add_process(filepath, exe)
 
                 # Start Monitor if not running
                 if self.monitor.is_running == False:
                     self.monitor.start_thread()
-
-            
-        except Exception as e:
+        except:
             log(traceback.format_exc())
-            log(str(e))
         

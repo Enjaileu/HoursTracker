@@ -36,10 +36,9 @@ Elise Vidal - evidal@artfx.fr
 Angele Sionneau - asionneau@artfx.fr
 '''
 
-# include plugin's scripts path in sys.path
+# include mhfx python libraries
 import sys
-import os
-sys.path.append(f"{os.path.dirname(os.path.abspath(__file__))}\\utils")
+sys.path.append('R:/Python/tiers')
 
 from Prism_HoursTrackerV2_Variables import Prism_HoursTrackerV2_Variables
 from Prism_HoursTrackerV2_Functions import Prism_HoursTrackerV2_Functions
