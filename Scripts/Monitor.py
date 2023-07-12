@@ -3,7 +3,7 @@ For Menhir FX
 author: Angele Sionneau asionneau@artfx.fr
 '''
 from threading import Thread
-from time import sleep
+from time import sleep, time
 import json
 import traceback
 
@@ -16,12 +16,19 @@ from monitor_utils.mhfx_log import log
 
 class Monitor(object):
     def __init__(self):
-        self.is_running = False
         self.thread = None
-        self.cycle_incr = 0
-        self.processes = {}
         self.wait = monitor.wait_sec
         self.id = str(id(self))
+        self.initialize_variables()
+    
+    def initialize_variables(self):
+        self.cycle_incr = 0
+        self.processes = {}
+        self.is_running = False
+        self.last_wait_start = None
+        self.other_session_sec = 0
+        self.last_process = None
+        self.wait_rest = 0.0
 
     def start_thread(self):
         '''
@@ -46,7 +53,8 @@ class Monitor(object):
         '''
         try:
             self.manage_processes_data()
-            self.is_running = False
+            self.initialize_variables()
+            self.cycle_incr = 0
         except Exception as e:
             log(traceback.format_exc())
     
@@ -78,6 +86,8 @@ class Monitor(object):
                         processes_copy.pop(p_pid)
                         proc = Process(filename, executable, pid, self.id)
                         processes_copy.update(proc.as_dict())
+                        self.last_process = proc.as_dict()
+                        break
                 self.processes = processes_copy
                 push_processes(self.processes)
             else:
@@ -85,6 +95,7 @@ class Monitor(object):
                     log(f"add new process {pid}")
                 proc = Process(filename, executable, pid, self.id)
                 self.processes.update(proc.as_dict())
+                self.last_process = proc.as_dict()
                 push_processes(self.processes)
 
         except:
@@ -108,7 +119,8 @@ class Monitor(object):
                 if is_user_afk(monitor.user_afk_sec):
                     if monitor.debug_mode:
                         log("user is afk")
-                        self.wait = monitor.wait_sec_afk
+                    self.wait = monitor.wait_sec_afk
+                    self.last_wait_start = time()
                 else:
                     self.wait = monitor.wait_sec
                     # count how many proc are closed
@@ -133,26 +145,72 @@ class Monitor(object):
                         if monitor.debug_mode:
                             log(f"current window :")
                             log(wndw)
+                        
+                        # last_wait_start
+                        if self.last_wait_start == None:
+                            to_add_sec = self.wait
+                        else:
+                            now = time()
+                            delta = now - self.last_wait_start + self.wait_rest
+                            to_add_sec = int(delta)
+                            self.wait_rest = delta - to_add_sec
+                        self.last_wait_start = time()
 
                         # if current window is monitored, update it
                         if window_pid in self.processes:
+                            # if right monitor
                             if self.processes[window_pid].get('monitor_id') == self.id and not is_user_afk(self.wait):
-                                self.processes[window_pid]['time'] += self.wait
+                                # update process 
+                                self.processes[window_pid]['time'] += to_add_sec
+                                self.processes[window_pid]['afk_sec'] = 0
                                 self.processes[window_pid]['status'] = Status.ACTIVE.name
-                                if monitor.debug_mode:
-                                    log(f"update this process :")
-                                    log(self.processes[window_pid])
-                                push_processes(self.processes)
-                        elif monitor.debug_mode:
-                            log(f"current window is not monitored.")
 
-                    # if cycle complete, write processes data to tracker data
-                    self.cycle_incr += self.wait
-                    if self.cycle_incr >= monitor.total_cycle and self.is_running == True:
-                        if monitor.debug_mode:
-                            log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
-                        self.cycle_incr = 0
-                        self.manage_processes_data()
+                                # update last process
+                                self.last_process = {window_pid : self.processes[window_pid]}
+                                if monitor.debug_mode:
+                                    log(f"update this process by adding {to_add_sec} seconds :")
+                                    log(self.processes[window_pid])
+
+                                # other session reinitialization
+                                self.other_session_sec = 0
+
+                                # push processes
+                                push_processes(self.processes)
+                        # else other session add to last session
+                        else :
+                            if monitor.debug_mode:
+                                log(f"current window is not monitored. Add it to last session")
+                            
+                            # if right monitor
+                            monitor_id = next(iter(self.last_process.values()))['monitor_id']
+                            if monitor_id == self.id and not is_user_afk(self.wait):
+
+                                self.other_session_sec += to_add_sec
+                                if not self.other_session_sec >= monitor.max_afk_cycle:
+                                    last_pid = str(next(iter(self.last_process.keys())))
+                                    self.processes[last_pid]['time'] += to_add_sec
+                                    self.processes[last_pid]['status'] = Status.INACTIVE.name
+                                    push_processes(self.processes)
+                                    
+                                    if monitor.debug_mode:
+                                        log(f"last process updated by adding {to_add_sec} seconds :")
+                                        log(self.processes[last_pid])
+
+                                        log(f"Other session since {self.other_session_sec} sec.")
+                                else:
+                                    if monitor.debug_mode:
+                                        log(f"max_afk_cycle reached for other session")
+                        
+                        
+                        if not is_user_afk(monitor.total_cycle):
+                        # if cycle complete, write processes data to tracker data
+                            self.cycle_incr += to_add_sec
+                            if self.cycle_incr >= monitor.total_cycle and self.is_running == True:
+                                if monitor.debug_mode:
+                                    log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
+                                self.cycle_incr = 0
+                                self.manage_processes_data()
+                        
 
             except Exception as e:
                 log(f"An exception occurred: {e}")
@@ -200,7 +258,7 @@ class Monitor(object):
                     if self.processes[pid]['afk_sec'] >= monitor.max_afk_cycle:
                         entity = get_entity(infos.get('filename'))
                         data = update_data(data, entity, infos.get('time'), infos.get('first'))
-                        self.processes[pid]['status'] = Status.OLD
+                        self.processes[pid]['status'] = Status.OLD.name
                 
             # write processes data
             push_processes(self.processes)

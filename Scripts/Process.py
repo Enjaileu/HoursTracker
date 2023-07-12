@@ -6,6 +6,7 @@ author: Angele Sionneau asionneau@artfx.fr
 from enum import Enum
 from pathlib import Path
 from datetime import datetime
+from monitor_utils.mhfx_log import log
 
 class Status(Enum):
     '''

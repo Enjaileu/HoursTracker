@@ -160,7 +160,7 @@ class Prism_HoursTrackerV2_Functions(object):
             exe = []
             if ext in mhfx_exe.executables.keys():
                 exe = mhfx_exe.executables.get(ext)
-            
+
             # Add process if a executable is found
             if len(exe) <= 0:
                 log(f"soft with this ext : {ext} is not in config")

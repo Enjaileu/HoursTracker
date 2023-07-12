@@ -144,8 +144,12 @@ def get_pid_by_process_name(process_names: list):
     :param process_names: list of str
     :return: int or None
     '''
-    def get_pids(process_names):
-        pids = []
+    found = False
+    incr = 0
+    timeout = monitor.wait_sec
+    pids = []
+
+    while found == False and incr < timeout:
         try:
             tasklist_output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
             tasklist_lines = tasklist_output.split('\n')[3:]
@@ -158,12 +162,15 @@ def get_pid_by_process_name(process_names: list):
                     pids.append(int(pid))
         except Exception as e:
             log(e)
-        return pids
 
-    pids = get_pids(process_names)
-    if not pids:
-        time.sleep(5)
-        pids = get_pids(process_names)
+        if len(pids) > 0:
+            found = True
+        else:
+            time.sleep(1)
+            incr += 1
+
+            if monitor.debug_mode:
+                log(f"pid not found")
 
     pid = pids[0] if pids else None
 
@@ -173,8 +180,7 @@ def get_pid_by_process_name(process_names: list):
 
 def is_user_afk(afk_time: int):
     '''
-    Checks whether the user has been AFK for longer than the time in seconds afk_time
-    or if the computer is in standby mode.
+    Checks whether the user has been AFK for longer than the time in seconds afk_time.
 
     :param afk_time: int
     :return: bool
@@ -189,8 +195,7 @@ def is_user_afk(afk_time: int):
     elapsed_time = (current_time - last_input_time) / 1000
     if monitor.debug_mode:
         log(f"Last user input happened {elapsed_time} seconds ago.")
+        log(f"max allowed = {afk_time}")
     
-    if elapsed_time <= afk_time:
-        return win32gui.GetForegroundWindow() == 0
-    return False
+    return elapsed_time >= afk_time
     

@@ -21,7 +21,6 @@ executables = {
     '.mb': maya_exe,
     '.hip': houdini_exe,
     '.hiplc': houdini_exe,
-    '.psd' : photoshop_exe,
     '.spp': substance_p_exe,
     '.aep': after_exe,
     '.prproj': premier_exe,
@@ -33,3 +32,6 @@ executables = {
     '.zpr': zbrush_exe
 
 } # association file extension -> executable
+
+# TODO : add it to executables when photoshop connect bug is fixed
+#'.psd' : photoshop_exe,
