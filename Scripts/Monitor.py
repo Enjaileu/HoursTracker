@@ -159,7 +159,7 @@ class Monitor(object):
                         # if current window is monitored, update it
                         if window_pid in self.processes:
                             # if right monitor
-                            if self.processes[window_pid].get('monitor_id') == self.id and not is_user_afk(self.wait):
+                            if self.processes[window_pid].get('monitor_id') == self.id:
                                 # update process 
                                 self.processes[window_pid]['time'] += to_add_sec
                                 self.processes[window_pid]['afk_sec'] = 0
@@ -183,7 +183,7 @@ class Monitor(object):
                             
                             # if right monitor
                             monitor_id = next(iter(self.last_process.values()))['monitor_id']
-                            if monitor_id == self.id and not is_user_afk(self.wait):
+                            if monitor_id == self.id:
 
                                 self.other_session_sec += to_add_sec
                                 if not self.other_session_sec >= monitor.max_afk_cycle:
@@ -202,14 +202,13 @@ class Monitor(object):
                                         log(f"max_afk_cycle reached for other session")
                         
                         
-                        if not is_user_afk(monitor.total_cycle):
                         # if cycle complete, write processes data to tracker data
-                            self.cycle_incr += to_add_sec
-                            if self.cycle_incr >= monitor.total_cycle and self.is_running == True:
-                                if monitor.debug_mode:
-                                    log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
-                                self.cycle_incr = 0
-                                self.manage_processes_data()
+                        self.cycle_incr += to_add_sec
+                        if self.cycle_incr >= monitor.total_cycle and self.is_running == True:
+                            if monitor.debug_mode:
+                                log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
+                            self.cycle_incr = 0
+                            self.manage_processes_data()
                         
 
             except Exception as e:
