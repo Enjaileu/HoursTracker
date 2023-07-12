@@ -111,13 +111,15 @@ class Prism_HoursTrackerV2_Functions(object):
         self.core.plugins.callUnpatchedFunction(self.core.openFile, filepath)
         self.core.callback(name="onFileOpen", args=[filepath])
 
-    def plugin_openScene(self, *args):
+    def plugin_openScene(self, origin, filepath, force=False):
         '''
         Ovveride function self.core.appPlugin.openScene.
         Use the overriden function then add callback "onFileOpen".
         '''
-        self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=args[0], filepath=args[1])
-        self.core.callback(name="onFileOpen", args=[args[1]])
+
+        log(f"{origin}, {filepath}, {force}")
+        self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
+        self.core.callback(name="onFileOpen", args=filepath)
 
 # FUNCTION
     def is_new_week(self, data, week):
@@ -141,38 +143,39 @@ class Prism_HoursTrackerV2_Functions(object):
 
         :param args: list, args[0] = filepath
         '''
+        filepath = ''.join(args)
+        log(filepath)
+        if filepath != 'Tools':
+            if monitor.debug_mode:
+                log(f"Prism open file : {filepath}")
+            try:
+                data = file.get_data(mhfx_path.user_data_json)
+                now = datetime.now()
+                week = now.isocalendar()[1]
+                # Check if it's a new week, archive and reset data if it is
+                if self.is_new_week(data, week) is True:
+                    file.backup_data(data)
+                    file.reset_user_data()
 
-        filepath = args[0]
-        if monitor.debug_mode:
-            log(f"Prism open file : {filepath}")
-        try:
-            data = file.get_data(mhfx_path.user_data_json)
-            now = datetime.now()
-            week = now.isocalendar()[1]
-            # Check if it's a new week, archive and reset data if it is
-            if self.is_new_week(data, week) is True:
-                file.backup_data(data)
-                file.reset_user_data()
+                # get extension and executable
+                filepath = Path(filepath)
+                ext = filepath.suffix
+                exe = []
+                if ext in mhfx_exe.executables.keys():
+                    exe = mhfx_exe.executables.get(ext)
 
-            # get extension and executable
-            filepath = Path(filepath)
-            ext = filepath.suffix
-            exe = []
-            if ext in mhfx_exe.executables.keys():
-                exe = mhfx_exe.executables.get(ext)
+                # Add process if a executable is found
+                if len(exe) <= 0:
+                    log(f"soft with this ext : {ext} is not in config")
+                    if monitor.debug_mode:
+                        log(f"if this extension is a ddc extension, please add it in mhfx_utils.config.mhfx_exe.py")
+                else:
+                    # Add process to monitor
+                    self.monitor.add_process(filepath, exe)
 
-            # Add process if a executable is found
-            if len(exe) <= 0:
-                log(f"soft with this ext : {ext} is not in config")
-                if monitor.debug_mode:
-                    log(f"if this extension is a ddc extension, please add it in mhfx_utils.config.mhfx_exe.py")
-            else:
-                # Add process to monitor
-                self.monitor.add_process(filepath, exe)
-
-                # Start Monitor if not running
-                if self.monitor.is_running == False:
-                    self.monitor.start_thread()
-        except:
-            log(traceback.format_exc())
+                    # Start Monitor if not running
+                    if self.monitor.is_running == False:
+                        self.monitor.start_thread()
+            except:
+                log(traceback.format_exc())
         

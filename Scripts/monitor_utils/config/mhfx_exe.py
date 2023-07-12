@@ -29,6 +29,7 @@ executables = {
     '.uproject': unreal_exe,
     '.sbs': substance_d_exe,
     '.ztl': zbrush_exe,
+    '.psd' : photoshop_exe,
     '.zpr': zbrush_exe
 
 } # association file extension -> executable
