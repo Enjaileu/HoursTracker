@@ -10,10 +10,13 @@ import time
 import ctypes
 import traceback
 import subprocess
+import win32com.client
 
 from monitor_utils.config.mhfx_path import file_template, file_template_bonus
 import monitor_utils.config.monitor as monitor
 from monitor_utils.mhfx_log import log
+
+
 
 def get_current_window():
     '''
@@ -105,26 +108,38 @@ def get_entity(filename):
 
 def does_process_exists(pid):
     '''
-    Verify if the process still exists in windows.
+    Verify if the process still exists in windows and has an active window.
 
     :param pid: str or int
     :return: bool
     '''
     try:
-        pid = str(pid)
-        tasklist_output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
-        tasklist_lines = tasklist_output.split('\n')[3:]
-        for line in tasklist_lines:
-            if not line.strip():
-                continue
-            task_pid = line[27:34].strip()  # Extract the PID based on its fixed position
-            if pid == task_pid:
-                return True
-        return False
-    except Exception as e:
-        log(str(e))
-        return False
+        pid = int(pid)  # Make sure pid is an integer
+        if monitor.debug_mode:
+            log(f"checking if process {pid} exists")
 
+        def callback(hwnd, hwnds):
+            '''
+            Callback function for win32gui.EnumWindows. It's called for each window handle and 
+            adds the handle to the list if the associated process has the target pid.
+            '''
+            _, process_id = win32process.GetWindowThreadProcessId(hwnd)
+            if process_id == pid and win32gui.IsWindowVisible(hwnd):
+                hwnds.append(hwnd)
+            return True
+
+        # Get all window handles associated with the target process
+        hwnds = []
+        win32gui.EnumWindows(callback, hwnds)
+        if monitor.debug_mode:
+            log('handles found:')
+            log(str(hwnds))
+
+        # If there's at least one window handle, the process is an application process
+        return bool(hwnds)
+    except Exception as e:
+        print(str(e))
+        return False
 
 def get_windows_username():
     '''
@@ -161,17 +176,26 @@ def get_pid_by_process_name(process_names: list):
                 if proc_name in process_names and pid:
                     pids.append(int(pid))
         except Exception as e:
-            log(e)
+            log(traceback.format_exc())
 
         if len(pids) > 0:
             found = True
         else:
-            time.sleep(1)
-            incr += 1
+            try:
+                wmi = win32com.client.GetObject("winmgmts:")
+                processes = wmi.InstancesOf("Win32_Process")
+                for process in processes:
+                    proc_name = process.Properties_("Name").Value
+                    if proc_name in process_names:
+                        pids.append(process.Properties_("ProcessId").Value)
+            except Exception as e:
+                log(traceback.format_exc())
 
-            if monitor.debug_mode:
-                log(f"pid not found")
-
+            if len(pids) > 0:
+                found = True
+            else:
+                time.sleep(1)
+                incr += 1
     pid = pids[0] if pids else None
 
     if monitor.debug_mode:

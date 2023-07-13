@@ -116,8 +116,6 @@ class Prism_HoursTrackerV2_Functions(object):
         Ovveride function self.core.appPlugin.openScene.
         Use the overriden function then add callback "onFileOpen".
         '''
-
-        log(f"{origin}, {filepath}, {force}")
         self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
         self.core.callback(name="onFileOpen", args=filepath)
 

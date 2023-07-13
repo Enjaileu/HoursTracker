@@ -189,12 +189,12 @@ class Monitor(object):
                                 if not self.other_session_sec >= monitor.max_afk_cycle:
                                     last_pid = str(next(iter(self.last_process.keys())))
                                     self.processes[last_pid]['time'] += to_add_sec
-                                    self.processes[last_pid]['status'] = Status.INACTIVE.name
+                                    self.processes[last_pid]['status'] = Status.ACTIVE.name
                                     push_processes(self.processes)
                                     
                                     if monitor.debug_mode:
                                         log(f"last process updated by adding {to_add_sec} seconds :")
-                                        log(self.processes[last_pid])
+                                        log({last_pid: self.processes[last_pid]})
 
                                         log(f"Other session since {self.other_session_sec} sec.")
                                 else:
