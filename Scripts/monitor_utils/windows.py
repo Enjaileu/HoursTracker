@@ -115,8 +115,6 @@ def does_process_exists(pid):
     '''
     try:
         pid = int(pid)  # Make sure pid is an integer
-        if monitor.debug_mode:
-            log(f"checking if process {pid} exists")
 
         def callback(hwnd, hwnds):
             '''
@@ -131,11 +129,10 @@ def does_process_exists(pid):
         # Get all window handles associated with the target process
         hwnds = []
         win32gui.EnumWindows(callback, hwnds)
-        if monitor.debug_mode:
-            log('handles found:')
-            log(str(hwnds))
 
         # If there's at least one window handle, the process is an application process
+        if monitor.debug_mode:
+            log(f"checking if process {pid} exists : {bool(hwnds)}")
         return bool(hwnds)
     except Exception as e:
         print(str(e))
@@ -151,7 +148,7 @@ def get_windows_username():
     return username
 
 
-def get_pid_by_process_name(process_names: list):
+def get_pid_by_process_name(process_names: list, monitor_processes: dict):
     '''
     Return the pid of a process by its name.
     If first try didn't succed, try again with a delay of 1 second.
@@ -196,11 +193,18 @@ def get_pid_by_process_name(process_names: list):
             else:
                 time.sleep(1)
                 incr += 1
-    pid = pids[0] if pids else None
-
+        
+    if len(pids) > 0:
+        for pid in pids:
+            if str(pid) not in monitor_processes.keys():
+                if monitor.debug_mode:
+                    log(f"pids associated with this process : {pid}")
+                return pid
+    
     if monitor.debug_mode:
-        log(f"pids associated with this process : {pid}")
-    return pid
+        log(f"No pid assiciated with this process.")
+    return None
+
 
 def is_user_afk(afk_time: int):
     '''
@@ -218,8 +222,7 @@ def is_user_afk(afk_time: int):
     # Calculate the elapsed time
     elapsed_time = (current_time - last_input_time) / 1000
     if monitor.debug_mode:
-        log(f"Last user input happened {elapsed_time} seconds ago.")
-        log(f"max allowed = {afk_time}")
+        log(f"Last user input happened {elapsed_time} seconds ago. max allowed = {afk_time}")
     
     return elapsed_time >= afk_time
     

@@ -142,7 +142,6 @@ class Prism_HoursTrackerV2_Functions(object):
         :param args: list, args[0] = filepath
         '''
         filepath = ''.join(args)
-        log(filepath)
         if filepath != 'Tools':
             if monitor.debug_mode:
                 log(f"Prism open file : {filepath}")

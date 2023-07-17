@@ -21,6 +21,9 @@ class Monitor(object):
         self.id = str(id(self))
         self.initialize_variables()
     
+    def __del__(self):
+        log("Monitor has been deleted")
+    
     def initialize_variables(self):
         self.cycle_incr = 0
         self.processes = {}
@@ -68,7 +71,7 @@ class Monitor(object):
         '''
         try:
             # get process pid
-            pid = int(get_pid_by_process_name(executable))
+            pid = int(get_pid_by_process_name(executable, self.processes))
 
             # read processes.json
             self.processes = get_processes()
@@ -135,9 +138,14 @@ class Monitor(object):
                     if len(self.processes) <= proc_closed:
                             if monitor.debug_mode:
                                 log('!!!!!!!!!!!!! all the proc are closed !!!!!!!!!!!!!')
-                            self.stop_thread()
                             push_processes({})
-                    
+                            self.stop_thread()
+                    # elif monitor no longer has a process, stop thread
+                    elif all(process['monitor_id'] != self.id for process in self.processes.values()):
+                        if monitor.debug_mode:
+                                log(f"Monitor {self.id} no longer has a process. Stopping monitor thread.")
+                        push_processes({})
+                        self.stop_thread()
                     else:
                         # get current window
                         wndw = get_current_window()
@@ -228,15 +236,6 @@ class Monitor(object):
             # get tracker data and processes data
             data = get_data(mhfx_path.user_data_json)
             processes_copy = self.processes.copy()
-
-            if monitor.debug_mode:
-                log(f"Before management, current processes are :")
-                log(self.processes)
-                log(f"Before management, current tracker for last days are :")
-                try :
-                    log(data.get('days')[-1])
-                except:
-                    log('{}')
             
             # actions
             for pid, infos in processes_copy.items():
