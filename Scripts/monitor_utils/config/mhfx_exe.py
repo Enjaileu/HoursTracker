@@ -30,9 +30,6 @@ executables = {
     '.sbs': substance_d_exe,
     '.ztl': zbrush_exe,
     '.psd' : photoshop_exe,
-    '.zpr': zbrush_exe
+    '.ZPR': zbrush_exe
 
 } # association file extension -> executable
-
-# TODO : add it to executables when photoshop connect bug is fixed
-#'.psd' : photoshop_exe,

@@ -140,9 +140,10 @@ def does_process_exists(pid):
 
 def get_windows_username():
     '''
-    Get the windows session username.
-    
-    :return: str
+    This function retrieves the username of the currently logged-in user in Windows.
+
+    Returns:
+    username (str): The username of the currently logged-in user.
     '''
     username = win32api.GetUserName()
     return username
@@ -150,11 +151,14 @@ def get_windows_username():
 
 def get_pid_by_process_name(process_names: list, monitor_processes: dict):
     '''
-    Return the pid of a process by its name.
-    If first try didn't succed, try again with a delay of 1 second.
+    This function retrieves the process IDs (PIDs) associated with the given process names.
 
-    :param process_names: list of str
-    :return: int or None
+    Parameters:
+    process_names (list): A list of process names to search for.
+    monitor_processes (dict): A dictionary containing monitor processes information.
+
+    Returns:
+    pid (int): The PID associated with the process name, or None if no PID is found.
     '''
     found = False
     incr = 0
@@ -208,10 +212,13 @@ def get_pid_by_process_name(process_names: list, monitor_processes: dict):
 
 def is_user_afk(afk_time: int):
     '''
-    Checks whether the user has been AFK for longer than the time in seconds afk_time.
+    This function checks if the user has been inactive for a specified amount of time.
 
-    :param afk_time: int
-    :return: bool
+    Parameters:
+    afk_time (int): The maximum allowed time of user inactivity in seconds.
+
+    Returns:
+    is_afk (bool): True if the user is inactive, False otherwise.
     '''
     # Get when the last input event happened
     last_input_time = win32api.GetLastInputInfo()
