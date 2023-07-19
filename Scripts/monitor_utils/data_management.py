@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta
 
 import monitor_utils.date as dt
-from monitor_utils.windows import get_windows_username
+from monitor_utils.windows import get_windows_username, does_process_exists
 import monitor_utils.data_initialise as di
 import monitor_utils.file as file
 import monitor_utils.config.mhfx_path as mhfx_path
@@ -233,17 +233,40 @@ def push_data(js_obj, json_obj):
     
     file.write_to_file(json_obj, mhfx_path.user_data_json)
 
-def push_processes(content):
+def push_processes(content, monitor_id):
     '''
     Write list of processes to user's tmp folder.
     '''
-    json_obj = json.dumps(content, indent=4)
+    data = file.get_data(mhfx_path.user_tmp_processes)
+    data_copy = data.copy()
+    for pid, infos in data_copy.items():
+        if infos.get('monitor_id') == str(monitor_id):
+            if not does_process_exists(pid):
+                data.pop(str(pid))
+    data.update(content)
+    json_obj = json.dumps(data, indent=4)
     file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
 
-def get_processes():
+def remove_processes(pids : list):
+    data = file.get_data(mhfx_path.user_tmp_processes)
+    for pid in pids:
+        data.pop(str(pid))
+    json_obj = json.dumps(data, indent=4)
+    file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
+
+
+def get_processes(monitor_id):
     '''
     Get the dictionnary of processes written in the user's tmp folder.
     
     :return: dict
     '''
-    return file.get_data(mhfx_path.user_tmp_processes)
+    m_id = str(monitor_id)
+    data =  file.get_data(mhfx_path.user_tmp_processes)
+    data_to_return = {}
+    if data != {}:
+        for pid, infos in data.items():
+            if infos.get('monitor_id') == m_id:
+                data_to_return[pid] = infos
+
+    return data_to_return

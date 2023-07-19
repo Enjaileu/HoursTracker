@@ -149,25 +149,24 @@ def get_windows_username():
     username = win32api.GetUserName()
     return username
 
-def get_pid_by_process_name(process_names: list, monitor_processes: dict, monitor_id: int):
+def get_pid_by_process_name(process_names: list, monitor_processes: dict):
     '''
     This function retrieves the process IDs (PIDs) associated with the given process names.
 
     Parameters:
     process_names (list): A list of process names to search for.
     monitor_processes (dict): A dictionary containing monitor processes information.
-    monitor_id (int): The monitor ID.
 
     Returns:
     pid (int): The PID associated with the process name, or None if no PID is found.
     '''
-
+    
     # remove the process from the list if not right monitor neither right executable
     monitor_processes_copy = monitor_processes.copy()
     for pid, infos in monitor_processes_copy.items():
-        if ast.literal_eval(infos.get('executable')) != process_names and infos.get('monitor_id') != str(monitor_id):
+        if ast.literal_eval(infos.get('executable')) != process_names:
             monitor_processes.pop(pid)
-    
+
     found = False
     incr = 0
     timeout = monitor.wait_sec
@@ -205,13 +204,12 @@ def get_pid_by_process_name(process_names: list, monitor_processes: dict, monito
             else:
                 time.sleep(1)
                 incr += 1
+
     if len(pids) > len(monitor_processes):
         keys = monitor_processes.keys()
         keys_int = [int(num) for num in keys]
         diff = set(pids) - set(keys_int)
         return list(diff)[0]
-    elif len(pids) == len(monitor_processes):
-        return -1
     
     if monitor.debug_mode:
         log(f"No pid associated with this process.")
@@ -224,7 +222,7 @@ def is_user_afk(afk_time: int):
 
     Parameters:
     afk_time (int): The maximum allowed time of user inactivity in seconds.
-
+ 
     Returns:
     is_afk (bool): True if the user is inactive, False otherwise.
     '''

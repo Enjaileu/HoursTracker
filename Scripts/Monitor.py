@@ -11,7 +11,7 @@ from Process import Process, Path, Status
 from monitor_utils.config import monitor, mhfx_path
 from monitor_utils.windows import get_current_window, get_entity, does_process_exists, get_pid_by_process_name, is_user_afk
 from monitor_utils.file import get_data
-from monitor_utils.data_management import update_data, push_data, get_processes, push_processes
+from monitor_utils.data_management import update_data, push_data, get_processes, push_processes, remove_processes
 from monitor_utils.mhfx_log import log
 
 class Monitor(object):
@@ -20,9 +20,6 @@ class Monitor(object):
         self.wait = monitor.wait_sec
         self.id = str(id(self))
         self.initialize_variables()
-    
-    def __del__(self):
-        log("Monitor has been deleted")
     
     def initialize_variables(self):
         self.cycle_incr = 0
@@ -71,14 +68,14 @@ class Monitor(object):
         '''
         try:
             # read processes.json
-            self.processes = get_processes()
-            log(f"self_processes : {self.processes}")
-            log(f"last_process : {self.last_process}")
+            self.processes = get_processes(self.id)
 
             # get process pid
             if pid == -1:
-                pid = int(get_pid_by_process_name(executable, self.processes, self.id))
-            log(f"pid found (monitor) : {pid}")
+                pid = int(get_pid_by_process_name(executable, self.processes))
+            
+            if monitor.debug_mode:
+                log(f"pid found : {pid}")
 
             # if already a process with the same pid, save tracker data and update processes with new infos
             # else add new process
@@ -96,15 +93,14 @@ class Monitor(object):
                         self.last_process = proc.as_dict()
                         break
                 self.processes = processes_copy
-                push_processes(self.processes)
+                push_processes(self.processes, self.id)
             else:
                 if monitor.debug_mode:
                     log(f"add new process {pid}")
                 proc = Process(filename, executable, pid, self.id)
                 self.processes.update(proc.as_dict())
-                log(f"monitor self.processes : {self.processes}")
                 self.last_process = proc.as_dict()
-                push_processes(self.processes)
+                push_processes(self.processes, self.id)
             
             if monitor.debug_mode:
                 log(f"New last process : {self.last_process}")
@@ -125,7 +121,7 @@ class Monitor(object):
                 log(f'#################  go wait for {self.wait} sec with monitor {self.id} #################')
             sleep(self.wait)
             if monitor.debug_mode:
-                log(f'Monitor : {self.id}')
+                log(f'################# Monitor : {self.id} waited #################')
             
             try:
                 # check if user is AFK
@@ -137,9 +133,9 @@ class Monitor(object):
                 else:
                     self.wait = monitor.wait_sec
                     # count how many proc are closed
-                    self.processes = get_processes()
+                    self.processes = get_processes(self.id)
                     proc_closed = 0
-                    for pid in self.processes.keys():
+                    for pid, infos in self.processes.items():
                         pid = int(pid)
                         if not does_process_exists(pid):
                             self.processes[str(pid)]['status'] = Status.OLD.name
@@ -148,13 +144,12 @@ class Monitor(object):
                     if len(self.processes) <= proc_closed:
                             if monitor.debug_mode:
                                 log('!!!!!!!!!!!!! all the proc are closed !!!!!!!!!!!!!')
-                            push_processes({})
+                            remove_processes(self.processes.keys())
                             self.stop_thread()
                     # elif monitor no longer has a process, stop thread
-                    elif all(process['monitor_id'] != self.id for process in self.processes.values()):
+                    elif len(self.processes) == 0:
                         if monitor.debug_mode:
                                 log(f"Monitor {self.id} no longer has a process. Stopping monitor thread.")
-                        push_processes({})
                         self.stop_thread()
                     else:
                         # get current window
@@ -194,7 +189,7 @@ class Monitor(object):
                                 self.other_session_sec = 0
 
                                 # push processes
-                                push_processes(self.processes)
+                                push_processes(self.processes, self.id)
                         # else other session add to last session
                         else :
                             if monitor.debug_mode:
@@ -209,7 +204,7 @@ class Monitor(object):
                                     last_pid = str(next(iter(self.last_process.keys())))
                                     self.processes[last_pid]['time'] += to_add_sec
                                     self.processes[last_pid]['status'] = Status.ACTIVE.name
-                                    push_processes(self.processes)
+                                    push_processes(self.processes, self.id)
                                     
                                     if monitor.debug_mode:
                                         log(f"last process updated by adding {to_add_sec} seconds :")
@@ -270,7 +265,7 @@ class Monitor(object):
                         self.processes[pid]['status'] = Status.OLD.name
                 
             # write processes data
-            push_processes(self.processes)
+            push_processes(self.processes, self.id)
             if monitor.debug_mode:
                 log(f"Processes has been updated :")
                 log(self.processes)
