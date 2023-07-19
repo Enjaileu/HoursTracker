@@ -30,6 +30,6 @@ executables = {
     '.sbs': substance_d_exe,
     '.ztl': zbrush_exe,
     '.psd' : photoshop_exe,
-    '.ZPR': zbrush_exe
+    '.zpr': zbrush_exe
 
 } # association file extension -> executable

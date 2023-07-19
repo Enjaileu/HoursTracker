@@ -61,7 +61,7 @@ class Monitor(object):
         except Exception as e:
             log(traceback.format_exc())
     
-    def add_process(self, filename: Path, executable: str):
+    def add_process(self, filename: Path, executable: str, pid: int):
         '''
         Create an object Process and convert it to dict. This dict will be writen in the processes.json file.
         If pid already exists, don't write it and change initial proc infos. 
@@ -70,11 +70,15 @@ class Monitor(object):
         :param executables: str, from config.monitor.executables
         '''
         try:
-            # get process pid
-            pid = int(get_pid_by_process_name(executable, self.processes))
-
             # read processes.json
             self.processes = get_processes()
+            log(f"self_processes : {self.processes}")
+            log(f"last_process : {self.last_process}")
+
+            # get process pid
+            if pid == -1:
+                pid = int(get_pid_by_process_name(executable, self.processes, self.id))
+            log(f"pid found (monitor) : {pid}")
 
             # if already a process with the same pid, save tracker data and update processes with new infos
             # else add new process
@@ -98,8 +102,12 @@ class Monitor(object):
                     log(f"add new process {pid}")
                 proc = Process(filename, executable, pid, self.id)
                 self.processes.update(proc.as_dict())
+                log(f"monitor self.processes : {self.processes}")
                 self.last_process = proc.as_dict()
                 push_processes(self.processes)
+            
+            if monitor.debug_mode:
+                log(f"New last process : {self.last_process}")
 
         except:
             log(traceback.format_exc())
@@ -116,6 +124,8 @@ class Monitor(object):
             if monitor.debug_mode:
                 log(f'#################  go wait for {self.wait} sec with monitor {self.id} #################')
             sleep(self.wait)
+            if monitor.debug_mode:
+                log(f'Monitor : {self.id}')
             
             try:
                 # check if user is AFK
@@ -151,8 +161,8 @@ class Monitor(object):
                         wndw = get_current_window()
                         window_pid = str(wndw.get('pid'))
                         if monitor.debug_mode:
-                            log(f"current window :")
-                            log(wndw)
+                            wndw = dict(wndw)
+                            log(f"current window : {wndw.get('pid')} - {wndw.get('title')} - {wndw.get('name')}")
                         
                         # last_wait_start
                         if self.last_wait_start == None:
@@ -178,6 +188,7 @@ class Monitor(object):
                                 if monitor.debug_mode:
                                     log(f"update this process by adding {to_add_sec} seconds :")
                                     log(self.processes[window_pid])
+                                    log(f'last process updatded')
 
                                 # other session reinitialization
                                 self.other_session_sec = 0
@@ -290,6 +301,5 @@ class Monitor(object):
                     return True
             return False
         except Exception as e:
-            log(f"An exception occurred: {e}")
             log(traceback.format_exc())
 

@@ -108,16 +108,18 @@ class Prism_HoursTrackerV2_Functions(object):
         Override function self.core.openFile.
         Use the overriden function then add callback "onFileOpen"
         '''
+        pid = -1
         self.core.plugins.callUnpatchedFunction(self.core.openFile, filepath)
-        self.core.callback(name="onFileOpen", args=[filepath])
+        self.core.callback(name="onFileOpen", args=[filepath, pid])
 
     def plugin_openScene(self, origin, filepath, force=False):
         '''
         Ovveride function self.core.appPlugin.openScene.
         Use the overriden function then add callback "onFileOpen".
         '''
+        pid = os.getpid()
         self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
-        self.core.callback(name="onFileOpen", args=filepath)
+        self.core.callback(name="onFileOpen", args=[filepath, pid])
 
 # FUNCTION
     def is_new_week(self, data, week):
@@ -141,9 +143,11 @@ class Prism_HoursTrackerV2_Functions(object):
 
         :param args: list, args[0] = filepath
         '''
-        filepath = ''.join(args)
+        filepath = ''.join(args[0])
+        pid = args[1]
         if filepath != 'Tools':
             if monitor.debug_mode:
+                log('////////////////////////////////////////////////////////////////////////////////////////')
                 log(f"Prism open file : {filepath}")
             try:
                 data = file.get_data(mhfx_path.user_data_json)
@@ -156,7 +160,7 @@ class Prism_HoursTrackerV2_Functions(object):
 
                 # get extension and executable
                 filepath = Path(filepath)
-                ext = filepath.suffix
+                ext = filepath.suffix.lower()
                 exe = []
                 if ext in mhfx_exe.executables.keys():
                     exe = mhfx_exe.executables.get(ext)
@@ -168,11 +172,16 @@ class Prism_HoursTrackerV2_Functions(object):
                         log(f"if this extension is a ddc extension, please add it in mhfx_utils.config.mhfx_exe.py")
                 else:
                     # Add process to monitor
-                    self.monitor.add_process(filepath, exe)
+                    self.monitor.add_process(filepath, exe, pid)
+
+                if monitor.debug_mode:
+                    log('////////////////////////////////////////////////////////////////////////////////////////')
 
                     # Start Monitor if not running
                     if self.monitor.is_running == False:
                         self.monitor.start_thread()
+
+
             except:
                 log(traceback.format_exc())
         

@@ -84,9 +84,7 @@ def update_data(data: dict, entity: dict, time: int, first: str):
     # get current time
     now = datetime.now()
     date = now.strftime('%d/%m/%y')
-    
     data = create_data(data, entity, first)
-
     try:
         # update session
         days = data.get('days')
@@ -94,26 +92,24 @@ def update_data(data: dict, entity: dict, time: int, first: str):
         for d in days:
             if d.get('date') ==  date:
                 project = entity.get('project_name')
-                projects = d.get('projects')
-                for p in projects:
+                for p in d.get('projects'):
                     if p.get('project_name') == project:
-                        project_sessions = p.get('project_sessions')
-                        for ps in project_sessions:
+                        for ps in p.get('project_sessions'):
                             total_time = timedelta(seconds=0)
                             asset_name = ps.get('asset_name')
                             department = ps.get('department')
                             if asset_name == entity.get('asset_name') and department == entity.get('department'):
-                                sessions = ps.get('asset_sessions')
-                                # update last action time
-                                sessions[-1]['last_action_time'] = now.strftime('%H:%M:%S')
-                                # update total_time session
-                                hours = time // 3600
-                                minutes = (time % 3600) // 60
-                                seconds = time % 60
-                                sessions[-1]['total_time'] = "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
-                            
-                                # update total_time project session
-                                for s in sessions:
+                                for s in reversed(ps.get('asset_sessions')):
+                                    if s.get('start_time') == first:
+                                        # update last action time
+                                        s['last_action_time'] = now.strftime('%H:%M:%S')
+                                        # update total_time session
+                                        hours = time // 3600
+                                        minutes = (time % 3600) // 60
+                                        seconds = time % 60
+                                        s['total_time'] = "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
+                                    
+                                    # update total_time project session
                                     tt = dt.get_time_as_datetime_obj(s.get('total_time'))
                                     delta_tt = timedelta(hours=tt.hour, minutes=tt.minute, seconds=tt.second)
                                     total_time += delta_tt
@@ -186,14 +182,15 @@ def initialise_data(data: dict, entity: dict, date: str, first: str):
             for s in sessions:
                 if s.get('asset_name') == entity.get('asset_name') and s.get('department') == entity.get('department'):
                     try:
-                        last_session = s.get('asset_sessions')[-1]
-                        session_first = last_session.get('start_time')
-                        if session_first == first:
-                            return data
-                        else:
-                            # need new asset session
-                            session = di.initialise_asset_session(first)
-                            return add_asset_session(data, entity, session)
+                        asset_sessions = s.get('asset_sessions')
+                        for a_s in reversed(asset_sessions):
+                            # asset session already exists
+                            if a_s.get('start_time') == first:
+                                return data
+
+                        # need new asset session
+                        session = di.initialise_asset_session(first)
+                        return add_asset_session(data, entity, session)
                     except:
                         # need new asset session
                         session = di.initialise_asset_session(first)
