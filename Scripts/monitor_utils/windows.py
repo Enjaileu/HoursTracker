@@ -150,23 +150,14 @@ def get_windows_username():
     return username
 
 def get_pid_by_process_name(process_names: list, monitor_processes: dict):
-    '''
-    This function retrieves the process IDs (PIDs) associated with the given process names.
-
-    Parameters:
-    process_names (list): A list of process names to search for.
-    monitor_processes (dict): A dictionary containing monitor processes information.
-
-    Returns:
-    pid (int): The PID associated with the process name, or None if no PID is found.
-    '''
-    
     # remove the process from the list if not right monitor neither right executable
     monitor_processes_copy = monitor_processes.copy()
     for pid, infos in monitor_processes_copy.items():
-        if ast.literal_eval(infos.get('executable')) != process_names:
+        if process_names[0] not in ast.literal_eval(infos.get('executable')) or not does_process_exists(pid):
             monitor_processes.pop(pid)
 
+
+    log(f"monitoring_processes = {str(monitor_processes_copy)}")
     found = False
     incr = 0
     timeout = monitor.wait_sec
@@ -174,37 +165,22 @@ def get_pid_by_process_name(process_names: list, monitor_processes: dict):
 
     while found == False and incr < timeout:
         try:
-            tasklist_output = subprocess.check_output('tasklist', shell=True).decode(errors='ignore')
-            tasklist_lines = tasklist_output.split('\n')[3:]
-            for line in tasklist_lines:
-                if not line.strip():
-                    continue
-                proc_name = line[:27].strip()
-                pid = line[27:34].strip()
-                if proc_name in process_names and pid:
-                    pids.append(int(pid))
+            wmi = win32com.client.GetObject("winmgmts:")
+            processes = wmi.InstancesOf("Win32_Process")
+            for process in processes:
+                proc_name = process.Properties_("Name").Value
+                if proc_name in process_names:
+                    pids.append(process.Properties_("ProcessId").Value)
         except Exception as e:
             log(traceback.format_exc())
 
-        if len(pids) >= len(monitor_processes):
+        log(f"pids = {str(pids)}")
+        log(f"len process = {str(len(monitor_processes))}")
+        if len(pids) > len(monitor_processes) and len(pids) > 0:
             found = True
         else:
-            try:
-                wmi = win32com.client.GetObject("winmgmts:")
-                processes = wmi.InstancesOf("Win32_Process")
-                for process in processes:
-                    proc_name = process.Properties_("Name").Value
-                    if proc_name in process_names:
-                        pids.append(process.Properties_("ProcessId").Value)
-            except Exception as e:
-                log(traceback.format_exc())
-
-            if len(pids) >= len(monitor_processes):
-                found = True
-            else:
-                time.sleep(1)
-                incr += 1
-
+            time.sleep(1)
+            incr += 1
     if len(pids) > len(monitor_processes):
         keys = monitor_processes.keys()
         keys_int = [int(num) for num in keys]
@@ -214,7 +190,6 @@ def get_pid_by_process_name(process_names: list, monitor_processes: dict):
     if monitor.debug_mode:
         log(f"No pid associated with this process.")
     return None
-
 
 def is_user_afk(afk_time: int):
     '''

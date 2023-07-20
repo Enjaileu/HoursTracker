@@ -25,6 +25,7 @@ from monitor_utils.mhfx_log import log
 import monitor_utils.file as file
 from Monitor import Monitor
 
+import time
 class Prism_HoursTrackerV2_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
@@ -89,10 +90,10 @@ class Prism_HoursTrackerV2_Functions(object):
             # replace function openFile
             self.core.plugins.monkeyPatch(self.core.openFile, self.openFile, self, force=True)
             self.core.plugins.monkeyPatch( self.core.appPlugin.openScene, self.plugin_openScene, self, force=True)
+            self.core.plugins.monkeyPatch( self.core.onExit, self.onExit, self, force=True)
 
             # callback
             self.core.callbacks.registerCallback("onFileOpen", self.onFileOpen, plugin=self)
-
         except Exception as e:
             log(traceback.format_exc())
 
@@ -112,6 +113,7 @@ class Prism_HoursTrackerV2_Functions(object):
         self.core.plugins.callUnpatchedFunction(self.core.openFile, filepath)
         self.core.callback(name="onFileOpen", args=[filepath, pid])
 
+
     def plugin_openScene(self, origin, filepath, force=False):
         '''
         Ovveride function self.core.appPlugin.openScene.
@@ -120,6 +122,11 @@ class Prism_HoursTrackerV2_Functions(object):
         pid = os.getpid()
         self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
         self.core.callback(name="onFileOpen", args=[filepath, pid])
+
+    def onExit(self):
+        self.saveForceProcess()
+        self.core.plugins.callUnpatchedFunction(self.core.onExit)
+        
 
 # FUNCTION
     def is_new_week(self, data, week):
@@ -148,7 +155,7 @@ class Prism_HoursTrackerV2_Functions(object):
         if filepath != 'Tools':
             if monitor.debug_mode:
                 log('////////////////////////////////////////////////////////////////////////////////////////')
-                log(f"Prism open file : {filepath} with monitor {self.monitor.id}")
+                log(f"Prism open file with monitor {self.monitor.id} : {filepath} ")
             try:
                 data = file.get_data(mhfx_path.user_data_json)
                 now = datetime.now()
@@ -181,7 +188,15 @@ class Prism_HoursTrackerV2_Functions(object):
                     if self.monitor.is_running == False:
                         self.monitor.start_thread()
 
-
             except:
                 log(traceback.format_exc())
-        
+
+    def saveForceProcess(self, *args):
+        if str(self.core.appPlugin.pluginName) != "Standalone":
+            try:
+                if monitor.debug_mode:
+                    fn = self.core.getCurrentFileName()
+                    log(f'saveForceProcess for monitor {self.monitor.id}')
+                self.monitor.monitor_action()
+            except Exception as e:
+                log(str(e))

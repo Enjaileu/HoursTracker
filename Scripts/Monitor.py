@@ -121,111 +121,114 @@ class Monitor(object):
             sleep(self.wait)
             if monitor.debug_mode:
                 log(f'################# Monitor : {self.id} waited #################')
+
+            self.monitor_action()
             
-            try:
-                # check if user is AFK
-                if is_user_afk(monitor.user_afk_sec):
-                    if monitor.debug_mode:
-                        log("user is afk")
-                    self.wait = monitor.wait_sec_afk
-                    self.last_wait_start = time()
-                else:
-                    self.wait = monitor.wait_sec
-                    # count how many proc are closed
-                    self.processes = get_processes(self.id)
-                    proc_closed = 0
-                    for pid, infos in self.processes.items():
-                        pid = int(pid)
-                        if not does_process_exists(pid):
-                            self.processes[str(pid)]['status'] = Status.OLD.name
-                            proc_closed += 1
-                    # if all proc closed, sppr processes and stop thread
-                    if len(self.processes) <= proc_closed:
-                            if monitor.debug_mode:
-                                log(f'!!!!!!!!!!!!! all the proc are closed for monitor {self.id} !!!!!!!!!!!!!')
-                            remove_processes(self.processes.keys())
-                            self.stop_thread()
-                    # elif monitor no longer has a process, stop thread
-                    elif len(self.processes) == 0:
+    def monitor_action(self):
+        try:
+            # check if user is AFK
+            if is_user_afk(monitor.user_afk_sec):
+                if monitor.debug_mode:
+                    log("user is afk")
+                self.wait = monitor.wait_sec_afk
+                self.last_wait_start = time()
+            else:
+                self.wait = monitor.wait_sec
+                # count how many proc are closed
+                self.processes = get_processes(self.id)
+                proc_closed = 0
+                for pid, infos in self.processes.items():
+                    pid = int(pid)
+                    if not does_process_exists(pid):
+                        self.processes[str(pid)]['status'] = Status.OLD.name
+                        proc_closed += 1
+                # if all proc closed, sppr processes and stop thread
+                if len(self.processes) <= proc_closed:
                         if monitor.debug_mode:
-                                log(f"Monitor {self.id} no longer has a process. Stopping monitor thread.")
+                            log(f'!!!!!!!!!!!!! all the proc are closed for monitor {self.id} !!!!!!!!!!!!!')
+                        remove_processes(self.processes.keys())
                         self.stop_thread()
+                # elif monitor no longer has a process, stop thread
+                elif len(self.processes) == 0:
+                    if monitor.debug_mode:
+                            log(f"Monitor {self.id} no longer has a process. Stopping monitor thread.")
+                    self.stop_thread()
+                else:
+                    # get current window
+                    wndw = get_current_window()
+                    window_pid = str(wndw.get('pid'))
+                    if monitor.debug_mode:
+                        log(f"current window : {wndw.get('pid')} - {wndw.get('title')} - {wndw.get('name')}".encode('ascii', 'ignore').decode('ascii'))
+                    
+                    # last_wait_start
+                    if self.last_wait_start == None:
+                        to_add_sec = self.wait
                     else:
-                        # get current window
-                        wndw = get_current_window()
-                        window_pid = str(wndw.get('pid'))
+                        now = time()
+                        delta = now - self.last_wait_start + self.wait_rest
+                        to_add_sec = int(delta)
+                        self.wait_rest = delta - to_add_sec
+                    self.last_wait_start = time()
+
+                    # if current window is monitored, update it
+                    if window_pid in self.processes:
+                        # if right monitor
+                        if self.processes[window_pid].get('monitor_id') == self.id:
+                            # update process 
+                            self.processes[window_pid]['time'] += to_add_sec
+                            self.processes[window_pid]['afk_sec'] = 0
+                            self.processes[window_pid]['status'] = Status.ACTIVE.name
+
+                            # update last process
+                            self.last_process = {window_pid : self.processes[window_pid]}
+                            if monitor.debug_mode:
+                                log(f"update this process by adding {to_add_sec} seconds :")
+                                log({window_pid: self.processes[window_pid]})
+                                log(f'last process updatded')
+
+                            # other session reinitialization
+                            self.other_session_sec = 0
+
+                            # push processes
+                            push_processes(self.processes, self.id)
+                    # else other session add to last session
+                    else :
                         if monitor.debug_mode:
-                            log(f"current window : {wndw.get('pid')} - {wndw.get('title')} - {wndw.get('name')}".encode('ascii', 'ignore').decode('ascii'))
+                            log(f"current window is not monitored. Add it to last session")
                         
-                        # last_wait_start
-                        if self.last_wait_start == None:
-                            to_add_sec = self.wait
-                        else:
-                            now = time()
-                            delta = now - self.last_wait_start + self.wait_rest
-                            to_add_sec = int(delta)
-                            self.wait_rest = delta - to_add_sec
-                        self.last_wait_start = time()
+                        # if right monitor
+                        monitor_id = next(iter(self.last_process.values()))['monitor_id']
+                        if monitor_id == self.id:
 
-                        # if current window is monitored, update it
-                        if window_pid in self.processes:
-                            # if right monitor
-                            if self.processes[window_pid].get('monitor_id') == self.id:
-                                # update process 
-                                self.processes[window_pid]['time'] += to_add_sec
-                                self.processes[window_pid]['afk_sec'] = 0
-                                self.processes[window_pid]['status'] = Status.ACTIVE.name
-
-                                # update last process
-                                self.last_process = {window_pid : self.processes[window_pid]}
-                                if monitor.debug_mode:
-                                    log(f"update this process by adding {to_add_sec} seconds :")
-                                    log({window_pid: self.processes[window_pid]})
-                                    log(f'last process updatded')
-
-                                # other session reinitialization
-                                self.other_session_sec = 0
-
-                                # push processes
+                            self.other_session_sec += to_add_sec
+                            if not self.other_session_sec >= monitor.max_afk_cycle:
+                                last_pid = str(next(iter(self.last_process.keys())))
+                                self.processes[last_pid]['time'] += to_add_sec
+                                self.processes[last_pid]['status'] = Status.ACTIVE.name
                                 push_processes(self.processes, self.id)
-                        # else other session add to last session
-                        else :
-                            if monitor.debug_mode:
-                                log(f"current window is not monitored. Add it to last session")
-                            
-                            # if right monitor
-                            monitor_id = next(iter(self.last_process.values()))['monitor_id']
-                            if monitor_id == self.id:
+                                
+                                if monitor.debug_mode:
+                                    log(f"last process updated by adding {to_add_sec} seconds :")
+                                    log({last_pid: self.processes[last_pid]})
 
-                                self.other_session_sec += to_add_sec
-                                if not self.other_session_sec >= monitor.max_afk_cycle:
-                                    last_pid = str(next(iter(self.last_process.keys())))
-                                    self.processes[last_pid]['time'] += to_add_sec
-                                    self.processes[last_pid]['status'] = Status.ACTIVE.name
-                                    push_processes(self.processes, self.id)
-                                    
-                                    if monitor.debug_mode:
-                                        log(f"last process updated by adding {to_add_sec} seconds :")
-                                        log({last_pid: self.processes[last_pid]})
+                                    log(f"Other session since {self.other_session_sec} sec.")
+                            else:
+                                if monitor.debug_mode:
+                                    log(f"max_afk_cycle reached for other session")
+                    
+                    
+                    # if cycle complete, write processes data to tracker data
+                    self.cycle_incr += to_add_sec
+                    if self.cycle_incr >= monitor.total_cycle and self.is_running == True:
+                        if monitor.debug_mode:
+                            log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
+                        self.cycle_incr = 0
+                        self.manage_processes_data()
+                    
 
-                                        log(f"Other session since {self.other_session_sec} sec.")
-                                else:
-                                    if monitor.debug_mode:
-                                        log(f"max_afk_cycle reached for other session")
-                        
-                        
-                        # if cycle complete, write processes data to tracker data
-                        self.cycle_incr += to_add_sec
-                        if self.cycle_incr >= monitor.total_cycle and self.is_running == True:
-                            if monitor.debug_mode:
-                                log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
-                            self.cycle_incr = 0
-                            self.manage_processes_data()
-                        
-
-            except Exception as e:
-                log(f"An exception occurred: {e}")
-                log(traceback.format_exc())
+        except Exception as e:
+            log(f"An exception occurred: {e}")
+            log(traceback.format_exc())
              
     def manage_processes_data(self):
         '''
@@ -234,13 +237,13 @@ class Monitor(object):
         Inactive : Manage AFK and write process data to tracker data.
         Old: Manage AFK and remove process data from processes.
         '''
-
         try:
 
             # get tracker data and processes data
             data = get_data(mhfx_path.user_data_json)
             processes_copy = self.processes.copy()
             
+            log(str(processes_copy.items()))
             # actions
             for pid, infos in processes_copy.items():
                 # ACTIVE

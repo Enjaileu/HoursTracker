@@ -233,6 +233,7 @@ def push_data(js_obj, json_obj):
     :param js_obj: json dict, tracker data
     :param json_obj: json dict, tracker data
     '''
+    log('push_data')
     content = "var data = '{}'".format(js_obj)
     file.write_to_file(content, mhfx_path.user_data_js)
     
@@ -242,6 +243,7 @@ def push_processes(content, monitor_id):
     '''
     Write list of processes to user's tmp folder.
     '''
+    log('push_processes')
     data = file.get_data(mhfx_path.user_tmp_processes)
     data_copy = data.copy()
     for pid, infos in data_copy.items():
