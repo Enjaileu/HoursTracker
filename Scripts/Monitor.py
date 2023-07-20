@@ -67,43 +67,42 @@ class Monitor(object):
         :param executables: str, from config.monitor.executables
         '''
         try:
-            # read processes.json
-            self.processes = get_processes(self.id)
 
-            # get process pid
+            # If it's a new process
             if pid == -1:
+                # get the pid
                 pid = int(get_pid_by_process_name(executable, self.processes))
-            
-            if monitor.debug_mode:
-                log(f"pid found : {pid}")
 
-            # if already a process with the same pid, save tracker data and update processes with new infos
-            # else add new process
-            is_duplicate = self.check_duplicate_pid(pid, self.processes)
-            if is_duplicate:
-                if monitor.debug_mode:
-                    log(f'pid {pid} already exists in processes.json')
-                processes_copy = self.processes.copy()
-                self.manage_processes_data()
-                for p_pid in self.processes.keys():
-                    if p_pid == str(pid):
-                        processes_copy.pop(p_pid)
-                        proc = Process(filename, executable, pid, self.id)
-                        processes_copy.update(proc.as_dict())
-                        self.last_process = proc.as_dict()
-                        break
-                self.processes = processes_copy
-                push_processes(self.processes, self.id)
+            # else it's an existing process
             else:
-                if monitor.debug_mode:
-                    log(f"add new process {pid}")
-                proc = Process(filename, executable, pid, self.id)
-                self.processes.update(proc.as_dict())
-                self.last_process = proc.as_dict()
-                push_processes(self.processes, self.id)
-            
-            if monitor.debug_mode:
-                log(f"New last process : {self.last_process}")
+                # get all processes and write the one with the existing pid to tracker data
+                self.processes = get_processes()
+                try:
+                    self.processes = {str(pid) : self.processes[str(pid)]}
+                    if monitor.debug_mode :
+                        log(f"pid {pid} already exists in processes: {self.processes}")
+                    self.manage_processes_data()
+
+                    # remove old processes with this pid
+                    pid_list = [pid,]
+                    remove_processes(pid_list)
+                    if monitor.debug_mode :
+                        log(f"pid {pid} removed from processes.")
+                except:
+                    if monitor.debug_mode:
+                        log(f"For unknown reason, pid doesn't exist in processes.")
+                    pid = int(get_pid_by_process_name(executable, self.processes)) 
+
+
+            # get process of the monitor and update it with new process
+            self.processes = get_processes(self.id)
+            proc = Process(filename, executable, pid, self.id)
+            self.processes.update(proc.as_dict())
+            self.last_process = proc.as_dict()
+            push_processes(self.processes, self.id)
+            if monitor.debug_mode :
+                log(f"New process added: {proc.as_dict()}.")
+                log(f"Last process updated: {self.last_process}.")
 
         except:
             log(traceback.format_exc())
@@ -143,7 +142,7 @@ class Monitor(object):
                     # if all proc closed, sppr processes and stop thread
                     if len(self.processes) <= proc_closed:
                             if monitor.debug_mode:
-                                log('!!!!!!!!!!!!! all the proc are closed !!!!!!!!!!!!!')
+                                log(f'!!!!!!!!!!!!! all the proc are closed for monitor {self.id} !!!!!!!!!!!!!')
                             remove_processes(self.processes.keys())
                             self.stop_thread()
                     # elif monitor no longer has a process, stop thread
@@ -156,8 +155,7 @@ class Monitor(object):
                         wndw = get_current_window()
                         window_pid = str(wndw.get('pid'))
                         if monitor.debug_mode:
-                            wndw = dict(wndw)
-                            log(f"current window : {wndw.get('pid')} - {wndw.get('title')} - {wndw.get('name')}")
+                            log(f"current window : {wndw.get('pid')} - {wndw.get('title')} - {wndw.get('name')}".encode('ascii', 'ignore').decode('ascii'))
                         
                         # last_wait_start
                         if self.last_wait_start == None:
@@ -182,7 +180,7 @@ class Monitor(object):
                                 self.last_process = {window_pid : self.processes[window_pid]}
                                 if monitor.debug_mode:
                                     log(f"update this process by adding {to_add_sec} seconds :")
-                                    log(self.processes[window_pid])
+                                    log({window_pid: self.processes[window_pid]})
                                     log(f'last process updatded')
 
                                 # other session reinitialization
@@ -266,11 +264,6 @@ class Monitor(object):
                 
             # write processes data
             push_processes(self.processes, self.id)
-            if monitor.debug_mode:
-                log(f"Processes has been updated :")
-                log(self.processes)
-                log(f"Tracker data has been updated. Last day :")
-                log(data.get('days')[-1])
 
             # write tracker data 
             js_obj = json.dumps(data)

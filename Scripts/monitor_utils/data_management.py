@@ -13,6 +13,7 @@ import monitor_utils.data_initialise as di
 import monitor_utils.file as file
 import monitor_utils.config.mhfx_path as mhfx_path
 from monitor_utils.mhfx_log import log
+import monitor_utils.config.monitor as monitor
 
 ## MODIFY
 def add_project(data: dict, project: dict):
@@ -108,12 +109,16 @@ def update_data(data: dict, entity: dict, time: int, first: str):
                                         minutes = (time % 3600) // 60
                                         seconds = time % 60
                                         s['total_time'] = "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
+                                        if monitor.debug_mode:
+                                            log(f"Update tracker data: {date} : {project} : {asset_name}-{department} : {s}")
                                     
                                     # update total_time project session
                                     tt = dt.get_time_as_datetime_obj(s.get('total_time'))
                                     delta_tt = timedelta(hours=tt.hour, minutes=tt.minute, seconds=tt.second)
                                     total_time += delta_tt
                                 ps['total_time'] = str(total_time)
+                                if monitor.debug_mode:
+                                    log(f"Total time updated : {asset_name}-{department} : {ps['total_time']}")
                                 break
                         break
         return data 
@@ -255,18 +260,25 @@ def remove_processes(pids : list):
     file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
 
 
-def get_processes(monitor_id):
+def get_processes(monitor_id=-1):
     '''
     Get the dictionnary of processes written in the user's tmp folder.
+    If monitor_id is -1, return all processes.
+    Else return only the process monitored by the given monitor_id.
     
     :return: dict
     '''
-    m_id = str(monitor_id)
     data =  file.get_data(mhfx_path.user_tmp_processes)
-    data_to_return = {}
-    if data != {}:
-        for pid, infos in data.items():
-            if infos.get('monitor_id') == m_id:
-                data_to_return[pid] = infos
 
-    return data_to_return
+    if monitor_id == -1:
+        return data
+    else:
+        m_id = str(monitor_id)
+        data_to_return = {}
+
+        if data != {}:
+            for pid, infos in data.items():
+                if infos.get('monitor_id') == m_id:
+                    data_to_return[pid] = infos
+
+        return data_to_return

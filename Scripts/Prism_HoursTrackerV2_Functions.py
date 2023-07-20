@@ -148,7 +148,7 @@ class Prism_HoursTrackerV2_Functions(object):
         if filepath != 'Tools':
             if monitor.debug_mode:
                 log('////////////////////////////////////////////////////////////////////////////////////////')
-                log(f"Prism open file : {filepath}")
+                log(f"Prism open file : {filepath} with monitor {self.monitor.id}")
             try:
                 data = file.get_data(mhfx_path.user_data_json)
                 now = datetime.now()
