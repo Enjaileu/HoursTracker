@@ -16,8 +16,9 @@ user_data_backup = user_data_dir + 'backup/'
 user_list_backup_json = user_data_dir + 'backups.json'
 user_list_backup_js = user_data_dir + 'backups.js'
 user_log = user_data_dir + 'log_hourstracker.txt'
-user_tmp_processes = user_tmp_dir + '/processes.json'
 user_config = user_data_dir + 'config.ini'
+user_tmp_processes = user_tmp_dir + '/processes.json'
+user_tmp_last_proc = user_tmp_dir + '/last_process.json'
 
 # template to get file properties according to the pipe
 file_template = "{letter}/{project_name}/03_Production/{asset_type}/{asset_subtype}/{asset_name}/Scenefiles/{department}/{task}/{file}.{ext}"

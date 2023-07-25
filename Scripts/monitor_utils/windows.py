@@ -9,9 +9,9 @@ import re
 import time
 import ctypes
 import traceback
-import subprocess
 import win32com.client
 import ast
+from pathlib import Path
 
 from monitor_utils.config.mhfx_path import file_template, file_template_bonus
 import monitor_utils.config.monitor as monitor
@@ -87,6 +87,20 @@ def get_entity(filename):
                 log("using bonus template")
             data = convert_file_to_data(filename, file_template_bonus)
             data['asset_subtype'] = data.get('asset_type')
+            try:
+                data.get('asset_subtype').lower()
+            except:
+                if monitor.debug_mode:
+                    log("No template work for this asset")
+                filename_path = Path(filename)
+                data = {
+                    'asset_type': 'unknown',
+                    'asset_subtype': '',
+                    'department': '',
+                    'task': '',
+                    'asset_name': str(filename_path.name),
+                    'project_name': str(filename_path.stem)
+                }
 
         entity ={
             'name': filename,
@@ -156,8 +170,6 @@ def get_pid_by_process_name(process_names: list, monitor_processes: dict):
         if process_names[0] not in ast.literal_eval(infos.get('executable')) or not does_process_exists(pid):
             monitor_processes.pop(pid)
 
-
-    log(f"monitoring_processes = {str(monitor_processes_copy)}")
     found = False
     incr = 0
     timeout = monitor.wait_sec
@@ -174,8 +186,6 @@ def get_pid_by_process_name(process_names: list, monitor_processes: dict):
         except Exception as e:
             log(traceback.format_exc())
 
-        log(f"pids = {str(pids)}")
-        log(f"len process = {str(len(monitor_processes))}")
         if len(pids) > len(monitor_processes) and len(pids) > 0:
             found = True
         else:
@@ -214,3 +224,23 @@ def is_user_afk(afk_time: int):
     
     return elapsed_time >= afk_time
     
+def get_window_name(pid):
+    def callback(hwnd, hwnds):
+        if win32gui.IsWindowVisible(hwnd) and win32gui.IsWindowEnabled(hwnd):
+            thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
+            if process_id == pid:
+                hwnds.append(hwnd)
+        return True
+
+    hwnds = []
+    win32gui.EnumWindows(callback, hwnds)
+
+    window_names = []
+    for hwnd in hwnds:
+        window_name = win32gui.GetWindowText(hwnd)
+        if window_name:
+            window_names.append(window_name)
+
+    if len(window_names) > 0:
+        return window_names
+    return None

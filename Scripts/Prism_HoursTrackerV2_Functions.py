@@ -24,6 +24,7 @@ from monitor_utils.config import mhfx_path, mhfx_exe, monitor
 from monitor_utils.mhfx_log import log
 import monitor_utils.file as file
 from Monitor import Monitor
+from monitor_utils.windows import get_window_name
 
 import time
 class Prism_HoursTrackerV2_Functions(object):
@@ -31,8 +32,8 @@ class Prism_HoursTrackerV2_Functions(object):
         self.core = core
         self.plugin = plugin
         # TODO : change
-        #self.version = self.core.version.split('.', 3)[-1]
-        self.prism_version = f"{self.core.version.split('.', 3)[-1]}.test"
+        #self.prism_version = self.core.version.split('.', 3)[-1]
+        self.prism_version = f"{self.core.version.split('.', 3)[-1]}.dev"
 
         try:
             # Verify and create filepath
@@ -84,6 +85,10 @@ class Prism_HoursTrackerV2_Functions(object):
                 with open(mhfx_path.user_tmp_processes, 'a') as json_file:
                     json_file.write('{}')
 
+            if not os.path.exists(mhfx_path.user_tmp_last_proc):
+                with open(mhfx_path.user_tmp_last_proc, 'a') as json_file:
+                    json_file.write('{}')
+
             # Initialise Monitor
             self.monitor = Monitor()
 
@@ -114,14 +119,78 @@ class Prism_HoursTrackerV2_Functions(object):
         self.core.callback(name="onFileOpen", args=[filepath, pid])
 
 
-    def plugin_openScene(self, origin, filepath, force=False):
+    def plugin_openScene(self, origin, filepath, force=True):
         '''
         Ovveride function self.core.appPlugin.openScene.
         Use the overriden function then add callback "onFileOpen".
         '''
+        
+        # get current pid
         pid = os.getpid()
-        self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
-        self.core.callback(name="onFileOpen", args=[filepath, pid])
+        
+        try:
+
+            # check if current scene is empty scene
+            empty_scene = False
+            current_file = self.core.getCurrentFileName()
+            
+            if current_file == 'unknown' or current_file == None or current_file =='':
+                empty_scene = True
+
+            # get file extensions
+            current_ext = Path(current_file).suffix
+            current_exe = mhfx_exe.executables.get(current_ext)
+            want_ext = Path(filepath).suffix
+            want_exe = mhfx_exe.executables.get(want_ext)
+
+            # get the plugin name
+            plugin_name = self.core.appPlugin.pluginName
+
+            if monitor.debug_mode:
+                log(f"current_file = {current_file}")
+                log(f"wanted_file = {filepath}")
+                log(f"Try to open with {plugin_name}")
+
+            # if current scene is empty scene
+            if empty_scene == True:
+                
+                if plugin_name in ['Photoshop', 'SubstancePainter']:
+                    if plugin_name == 'Photoshop' and want_ext not in ['.psd']:
+                        if monitor.debug_mode:
+                            log(f"User try to open file with extension {want_ext} in Photoshop : Fail.")
+                        return
+                    elif plugin_name == 'SubstancePainter' and want_ext not in ['.spp']:
+                        if monitor.debug_mode:
+                            log(f"User try to open file with extension {want_ext} in SubstancePainter : Fail.")
+                        return
+                
+                if Path(filepath).suffix != '':
+                    is_openning = self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
+                    if is_openning == True:
+                        self.core.callback(name="onFileOpen", args=[filepath, pid])
+            elif current_exe == want_exe:
+                # ask for saving action if not empty scene
+                answers = ["Save", "Don't Save", "Cancel"]
+                option = self.core.popupQuestion(text = "Save Changes ?", title="Open new scene", buttons=answers )
+                if monitor.debug_mode:
+                    log(f"User choose '{option}'")
+                # user want to save
+                if option == answers[0]:
+                    self.core.saveScene(filepath=current_file)
+                    is_openning = self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
+                    if is_openning == True:
+                        self.core.callback(name="onFileOpen", args=[filepath, pid])
+                # user want to open but not save current scene
+                elif option == answers[1]:
+                    is_openning = self.core.plugins.callUnpatchedFunction(self.core.appPlugin.openScene, origin=origin, filepath=filepath, force=force)
+                    if is_openning == True:
+                        self.core.callback(name="onFileOpen", args=[filepath, pid])
+                # cancel -> do noting
+
+        except Exception as e:
+            log(str(e))
+        
+
 
     def onExit(self):
         self.saveForceProcess()
@@ -156,6 +225,7 @@ class Prism_HoursTrackerV2_Functions(object):
             if monitor.debug_mode:
                 log('////////////////////////////////////////////////////////////////////////////////////////')
                 log(f"Prism open file with monitor {self.monitor.id} : {filepath} ")
+                log(f"...from Prism {str(self.core.appPlugin.pluginName)}")
             try:
                 data = file.get_data(mhfx_path.user_data_json)
                 now = datetime.now()
@@ -181,7 +251,7 @@ class Prism_HoursTrackerV2_Functions(object):
                     # Add process to monitor
                     self.monitor.add_process(filepath, exe, pid)
 
-                if monitor.debug_mode:
+                if monitor.debug_mode: 
                     log('////////////////////////////////////////////////////////////////////////////////////////')
 
                     # Start Monitor if not running
@@ -197,6 +267,6 @@ class Prism_HoursTrackerV2_Functions(object):
                 if monitor.debug_mode:
                     fn = self.core.getCurrentFileName()
                     log(f'saveForceProcess for monitor {self.monitor.id}')
-                self.monitor.monitor_action()
+                self.monitor.saveClosedProcess()
             except Exception as e:
                 log(str(e))

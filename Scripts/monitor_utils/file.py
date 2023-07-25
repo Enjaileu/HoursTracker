@@ -28,6 +28,9 @@ def get_data(path):
                 log(traceback.format_exc())
                 log(str(e))
             data = json.loads(raw_data)
+        
+        if data == None:
+            data = {} 
     except:
         log(traceback.format_exc())
         # If json file empty return empty dict/json object
