@@ -168,44 +168,46 @@ def initialise_data(data: dict, entity: dict, date: str, first: str):
     :param first: string, when the session was opened
     :return: dict, tracker data modified
     '''
+    try:
+        # if no data, initialise complete data set with entity
+        if data == {}:
+            return di.initialise_data(date, entity, first)
 
-    # if no data, initialise complete data set with entity
-    if data == {}:
-        return di.initialise_data(date, entity, first)
+        # if current date don't exist in tracker data, create it with entity
+        if not does_day_exist(data, date):
+            new_day = di.initialise_day(date, entity, first)
+            data.get('days').append(new_day)
+            return data
+        
+        # others situations
+        projects = data.get('days')[-1].get('projects')
+        for p in projects:
+            if p.get('project_name') == entity.get('project_name'):
+                sessions = p.get('project_sessions')
+                for s in sessions:
+                    if s.get('asset_name') == entity.get('asset_name') and s.get('department') == entity.get('department'):
+                        try:
+                            asset_sessions = s.get('asset_sessions')
+                            for a_s in reversed(asset_sessions):
+                                # asset session already exists
+                                if a_s.get('start_time') == first:
+                                    return data
 
-    # if current date don't exist in tracker data, create it with entity
-    if not does_day_exist(data, date):
-        new_day = di.initialise_day(date, entity, first)
-        data.get('days').append(new_day)
-        return data
-    
-    # others situations
-    projects = data.get('days')[-1].get('projects')
-    for p in projects:
-        if p.get('project_name') == entity.get('project_name'):
-            sessions = p.get('project_sessions')
-            for s in sessions:
-                if s.get('asset_name') == entity.get('asset_name') and s.get('department') == entity.get('department'):
-                    try:
-                        asset_sessions = s.get('asset_sessions')
-                        for a_s in reversed(asset_sessions):
-                            # asset session already exists
-                            if a_s.get('start_time') == first:
-                                return data
-
-                        # need new asset session
-                        session = di.initialise_asset_session(first)
-                        return add_asset_session(data, entity, session)
-                    except:
-                        # need new asset session
-                        session = di.initialise_asset_session(first)
-                        return add_asset_session(data, entity, session)
-            # entity not found in project sessions
-            session = di.initialise_project_sessions(entity, first)
-            return add_project_session(data, session, entity)
-    # project was not found
-    project = di.initialise_project(entity, first)
-    return add_project(data, project)
+                            # need new asset session
+                            session = di.initialise_asset_session(first)
+                            return add_asset_session(data, entity, session)
+                        except:
+                            # need new asset session
+                            session = di.initialise_asset_session(first)
+                            return add_asset_session(data, entity, session)
+                # entity not found in project sessions
+                session = di.initialise_project_sessions(entity, first)
+                return add_project_session(data, session, entity)
+        # project was not found
+        project = di.initialise_project(entity, first)
+        return add_project(data, project)
+    except:
+        log(traceback.format_exc())
 
 ## CHECK
 
@@ -233,32 +235,48 @@ def push_data(js_obj, json_obj):
     :param js_obj: json dict, tracker data
     :param json_obj: json dict, tracker data
     '''
-    content = "var data = '{}'".format(js_obj)
-    file.write_to_file(content, mhfx_path.user_data_js)
-    
-    file.write_to_file(json_obj, mhfx_path.user_data_json)
+    try:
+        content = "var data = '{}'".format(js_obj)
+        file.write_to_file(content, mhfx_path.user_data_js)
+        
+        file.write_to_file(json_obj, mhfx_path.user_data_json)
+    except:
+        log(traceback.format_exc())
 
 def push_processes(content, monitor_id=-1):
     '''
     Write list of processes to user's tmp folder.
+
+    :param content: dict
+    :param monitor_id: int
     '''
-    data = file.get_data(mhfx_path.user_tmp_processes)
-    data_copy = data.copy()
-    for pid, infos in data_copy.items():
-        if infos.get('monitor_id') == str(monitor_id):
-            if not does_process_exists(pid):
-                data.pop(str(pid))
-    data.update(content)
-    json_obj = json.dumps(data, indent=4)
-    file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
+    try:
+        data = file.get_data(mhfx_path.user_tmp_processes)
+        data_copy = data.copy()
+        for pid, infos in data_copy.items():
+            if infos.get('monitor_id') == str(monitor_id) or monitor_id == -1:
+                if not does_process_exists(pid):
+                    data.pop(str(pid))
+        data.update(content)
+        json_obj = json.dumps(data, indent=4)
+        file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
+    except:
+        log(traceback.format_exc())
 
 def remove_processes(pids : list):
-    data = file.get_data(mhfx_path.user_tmp_processes)
-    for pid in pids:
-        data.pop(str(pid))
-    json_obj = json.dumps(data, indent=4)
-    file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
+    '''
+    Remove processes from tmp file processes.json with the pid in pids.
 
+    :param pids : list of int or list of str of int
+    '''
+    try:
+        data = file.get_data(mhfx_path.user_tmp_processes)
+        for pid in pids:
+            data.pop(str(pid))
+        json_obj = json.dumps(data, indent=4)
+        file.write_to_file(json_obj, mhfx_path.user_tmp_processes)
+    except:
+        log(traceback.format_exc())
 
 def get_processes(monitor_id=-1):
     '''
@@ -268,30 +286,50 @@ def get_processes(monitor_id=-1):
     
     :return: dict
     '''
-    data =  file.get_data(mhfx_path.user_tmp_processes)
+    try:
+        data =  file.get_data(mhfx_path.user_tmp_processes)
 
-    if monitor_id == -1:
-        return data
-    else:
+        if monitor_id == -1:
+            return data
+        else:
+            m_id = str(monitor_id)
+            data_to_return = {}
+
+            if data != {}:
+                for pid, infos in data.items():
+                    if infos.get('monitor_id') == m_id:
+                        data_to_return[pid] = infos
+
+            return data_to_return
+    except:
+        log(traceback.format_exc())
+
+def get_last_process(monitor_id=-1):
+    '''
+    Return data in tmp file last_process.
+    If monitor_id specified, return last_process only if it is monitored by the given monitor_id.
+    
+    :param monitor_id: int 
+    '''
+    try:
+        last = file.get_data(mhfx_path.user_tmp_last_proc)
         m_id = str(monitor_id)
-        data_to_return = {}
-
-        if data != {}:
-            for pid, infos in data.items():
-                if infos.get('monitor_id') == m_id:
-                    data_to_return[pid] = infos
-
-        return data_to_return
-
-def get_last_process(monitor_id):
-    last = file.get_data(mhfx_path.user_tmp_last_proc)
-    m_id = str(monitor_id)
-    if last != {}:
-        pid = next(iter(last))
-        if m_id == last[pid].get('monitor_id'):
-            return last
-    return None
+        if last != {}:
+            pid = next(iter(last))
+            if m_id == last[pid].get('monitor_id') or m_id == "-1":
+                return last
+        return None
+    except:
+        log(traceback.format_exc())
 
 def push_last_process(last):
-    json_obj = json.dumps(last, indent=4)
-    file.write_to_file(json_obj, mhfx_path.user_tmp_last_proc)
+    '''
+    Write dict in param last to tmp file last_process.json.
+
+    :param last: dict
+    '''
+    try:
+        json_obj = json.dumps(last, indent=4)
+        file.write_to_file(json_obj, mhfx_path.user_tmp_last_proc)
+    except:
+        log(traceback.format_exc())

@@ -45,9 +45,12 @@ def write_to_file(content, filename):
     :param content: dict
     :param filename: string
     '''
-    output_file = open(filename, 'w')
-    output_file.write(content)
-    output_file.close()
+    try:
+        output_file = open(filename, 'w')
+        output_file.write(content)
+        output_file.close()
+    except:
+        log(traceback.format_exc())
 
 def backup_data(data):
     """
@@ -56,54 +59,60 @@ def backup_data(data):
 
     :param data: dict, data to backup
     """
-    # last week and last year
-    week = data.get('week')
-    year = data.get('year')
-    week_definition = data.get('week_description')
+    try:
+        # last week and last year
+        week = data.get('week')
+        year = data.get('year')
+        week_definition = data.get('week_description')
 
-    # write hours data
-    src = mhfx_path.user_data_json
-    dst = f"{mhfx_path.user_data_backup}{week}_{year}_hours.json"
-    shutil.copy(src, dst)
+        # write hours data
+        src = mhfx_path.user_data_json
+        dst = f"{mhfx_path.user_data_backup}{week}_{year}_hours.json"
+        shutil.copy(src, dst)
 
-    src = mhfx_path.user_data_js
-    dst = f"{mhfx_path.user_data_backup}{week}_{year}_hours.js"
-    shutil.copy(src, dst)
+        src = mhfx_path.user_data_js
+        dst = f"{mhfx_path.user_data_backup}{week}_{year}_hours.js"
+        shutil.copy(src, dst)
 
-    src = mhfx_path.user_log
-    dst = f"{mhfx_path.user_data_backup}{week}_{year}_log.txt"
-    shutil.copy(src, dst)
+        src = mhfx_path.user_log
+        dst = f"{mhfx_path.user_data_backup}{week}_{year}_log.txt"
+        shutil.copy(src, dst)
 
-    # write backup data
-    new_bckp = create_backup_info(week, year, week_definition)
-    bckp_info = get_data(mhfx_path.user_list_backup_json)
-    if bckp_info == {}:
-        bckp_info = {"backups":[]}
-    bckp_info.get('backups').insert(0, new_bckp)
+        # write backup data
+        new_bckp = create_backup_info(week, year, week_definition)
+        bckp_info = get_data(mhfx_path.user_list_backup_json)
+        if bckp_info == {}:
+            bckp_info = {"backups":[]}
+        bckp_info.get('backups').insert(0, new_bckp)
 
-    js_obj = json.dumps(bckp_info)
-    content = f"var data = '{js_obj}'"
-    write_to_file(content, mhfx_path.user_list_backup_js)
+        js_obj = json.dumps(bckp_info)
+        content = f"var data = '{js_obj}'"
+        write_to_file(content, mhfx_path.user_list_backup_js)
 
-    json_obj = json.dumps(bckp_info, indent=4)
-    write_to_file(json_obj, mhfx_path.user_list_backup_json)
+        json_obj = json.dumps(bckp_info, indent=4)
+        write_to_file(json_obj, mhfx_path.user_list_backup_json)
 
-    write_to_file('', mhfx_path.user_log)
+        write_to_file('', mhfx_path.user_log)
+    except:
+        log(traceback.format_exc())
 
 def reset_user_data():
     """
     Resets the json, js, and txt files containing the user's data
     """
-    file_paths = [mhfx_path.user_data_json, mhfx_path.user_data_js, mhfx_path.user_log]
+    try:
+        file_paths = [mhfx_path.user_data_json, mhfx_path.user_data_js, mhfx_path.user_log, mhfx_path.user_tmp_processes, mhfx_path.user_tmp_last_proc]
 
-    for file_path in file_paths:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        with open(file_path, 'w') as file:
-            if file_path.endswith('.json'):
-                file.write("{}")
-            else:
-                file.write('')
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            with open(file_path, 'w') as file:
+                if file_path.endswith('.json'):
+                    file.write("{}")
+                else:
+                    file.write('')
+    except:
+        log(traceback.format_exc())
 
 def create_backup_info(week, year, week_definition):
     '''
@@ -113,11 +122,14 @@ def create_backup_info(week, year, week_definition):
     :param year: int
     :return: dict
     '''
-    bkp = {
-        "week": str(week),
-        "year": str(year),
-        "path": f"{mhfx_path.user_data_backup}{week}_{year}_hours.js",
-        "week_description": str(week_definition)
-    }
+    try:
+        bkp = {
+            "week": str(week),
+            "year": str(year),
+            "path": f"{mhfx_path.user_data_backup}{week}_{year}_hours.js",
+            "week_description": str(week_definition)
+        }
 
-    return bkp
+        return bkp
+    except:
+        log(traceback.format_exc())

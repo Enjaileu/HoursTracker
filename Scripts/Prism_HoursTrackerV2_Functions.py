@@ -21,19 +21,15 @@ except:
 from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 
 from monitor_utils.config import mhfx_path, mhfx_exe, monitor
-from monitor_utils.mhfx_log import log
 import monitor_utils.file as file
 from Monitor import Monitor
-from monitor_utils.windows import get_window_name
+from monitor_utils.mhfx_log import log
 
-import time
 class Prism_HoursTrackerV2_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
-        # TODO : change
-        #self.prism_version = self.core.version.split('.', 3)[-1]
-        self.prism_version = f"{self.core.version.split('.', 3)[-1]}.dev"
+        self.prism_version = f"{self.core.version.split('.', 3)[-1]}"
 
         try:
             # Verify and create filepath
@@ -193,10 +189,12 @@ class Prism_HoursTrackerV2_Functions(object):
 
 
     def onExit(self):
+        '''
+        Override the PrismCore.onExit method. Before exit Prism, ask to the monitor to save its Process data.
+        '''
         self.saveForceProcess()
         self.core.plugins.callUnpatchedFunction(self.core.onExit)
         
-
 # FUNCTION
     def is_new_week(self, data, week):
         """
@@ -206,10 +204,30 @@ class Prism_HoursTrackerV2_Functions(object):
         :param week: int
         :return: bool
         """
-        if data == {}:
-            return False
+        if data == {} or data == None:
+            return True
         last_week = data.get('week')
         return last_week != str(week)
+
+    def is_new_day(self, data: dict, date: str):
+        '''
+        Checks if the given date exists in the data
+
+        :param data: dict
+        :param date: string
+        :return: bool
+        '''
+        try:
+
+            if data == {} or data == None:
+                return True
+            for d in data.get('days'):
+                log(f"{d.get('date')} == {date} : {d.get('date') == date}")
+                if d.get('date') == date:
+                    return False
+            return True
+        except Exception as e:
+            log(traceback.format_exc())
 
 # CALLBACK
     def onFileOpen(self, *args):
@@ -230,10 +248,19 @@ class Prism_HoursTrackerV2_Functions(object):
                 data = file.get_data(mhfx_path.user_data_json)
                 now = datetime.now()
                 week = now.isocalendar()[1]
+                date = now.strftime('%d/%m/%y')
                 # Check if it's a new week, archive and reset data if it is
                 if self.is_new_week(data, week) is True:
+                    if monitor.debug_mode:
+                        log("New week")
                     file.backup_data(data)
                     file.reset_user_data()
+                    self.monitor.saveClosedProcess(False)
+                # Check if it's new day, reset processes data if it's true
+                elif self.is_new_day(data, date):
+                    if monitor.debug_mode:
+                        log("New day")
+                    self.monitor.saveClosedProcess(False)
 
                 # get extension and executable
                 filepath = Path(filepath)
@@ -267,6 +294,6 @@ class Prism_HoursTrackerV2_Functions(object):
                 if monitor.debug_mode:
                     fn = self.core.getCurrentFileName()
                     log(f'saveForceProcess for monitor {self.monitor.id}')
-                self.monitor.saveClosedProcess()
+                self.monitor.saveClosedProcess(True)
             except Exception as e:
                 log(str(e))

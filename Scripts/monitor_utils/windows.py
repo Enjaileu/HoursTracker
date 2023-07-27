@@ -17,8 +17,6 @@ from monitor_utils.config.mhfx_path import file_template, file_template_bonus
 import monitor_utils.config.monitor as monitor
 from monitor_utils.mhfx_log import log
 
-
-
 def get_current_window():
     '''
     Get the current active window and return it as a dict.
@@ -160,46 +158,60 @@ def get_windows_username():
     Returns:
     username (str): The username of the currently logged-in user.
     '''
-    username = win32api.GetUserName()
-    return username
+    try:
+        username = win32api.GetUserName()
+        return username
+    except:
+        return "Username unknown"
 
 def get_pid_by_process_name(process_names: list, monitor_processes: dict):
+    '''
+    Somehow thanks to the process names, get the pid of the new process opened.
+
+    :param process_names: list
+    :param monitor_processes: dict
+
+    :return: pid of the process (int) or None if not found.
+    '''
     # remove the process from the list if not right monitor neither right executable
-    monitor_processes_copy = monitor_processes.copy()
-    for pid, infos in monitor_processes_copy.items():
-        if process_names[0] not in ast.literal_eval(infos.get('executable')) or not does_process_exists(pid):
-            monitor_processes.pop(pid)
+    try:
+        monitor_processes_copy = monitor_processes.copy()
+        for pid, infos in monitor_processes_copy.items():
+            if process_names[0] not in ast.literal_eval(infos.get('executable')) or not does_process_exists(pid):
+                monitor_processes.pop(pid)
 
-    found = False
-    incr = 0
-    timeout = monitor.wait_sec
-    pids = []
+        found = False
+        incr = 0
+        timeout = monitor.wait_sec
+        pids = []
 
-    while found == False and incr < timeout:
-        try:
-            wmi = win32com.client.GetObject("winmgmts:")
-            processes = wmi.InstancesOf("Win32_Process")
-            for process in processes:
-                proc_name = process.Properties_("Name").Value
-                if proc_name in process_names:
-                    pids.append(process.Properties_("ProcessId").Value)
-        except Exception as e:
-            log(traceback.format_exc())
+        while found == False and incr < timeout:
+            try:
+                wmi = win32com.client.GetObject("winmgmts:")
+                processes = wmi.InstancesOf("Win32_Process")
+                for process in processes:
+                    proc_name = process.Properties_("Name").Value
+                    if proc_name in process_names:
+                        pids.append(process.Properties_("ProcessId").Value)
+            except Exception as e:
+                log(traceback.format_exc())
 
-        if len(pids) > len(monitor_processes) and len(pids) > 0:
-            found = True
-        else:
-            time.sleep(1)
-            incr += 1
-    if len(pids) > len(monitor_processes):
-        keys = monitor_processes.keys()
-        keys_int = [int(num) for num in keys]
-        diff = set(pids) - set(keys_int)
-        return list(diff)[0]
-    
-    if monitor.debug_mode:
-        log(f"No pid associated with this process.")
-    return None
+            if len(pids) > len(monitor_processes) and len(pids) > 0:
+                found = True
+            else:
+                time.sleep(1)
+                incr += 1
+        if len(pids) > len(monitor_processes):
+            keys = monitor_processes.keys()
+            keys_int = [int(num) for num in keys]
+            diff = set(pids) - set(keys_int)
+            return list(diff)[0]
+        
+        if monitor.debug_mode:
+            log(f"No pid associated with this process.")
+        return None
+    except:
+        log(traceback.format_exc())
 
 def is_user_afk(afk_time: int):
     '''
@@ -211,36 +223,18 @@ def is_user_afk(afk_time: int):
     Returns:
     is_afk (bool): True if the user is inactive, False otherwise.
     '''
-    # Get when the last input event happened
-    last_input_time = win32api.GetLastInputInfo()
+    try:
+        # Get when the last input event happened
+        last_input_time = win32api.GetLastInputInfo()
 
-    # Get the current time
-    current_time = win32api.GetTickCount()
+        # Get the current time
+        current_time = win32api.GetTickCount()
 
-    # Calculate the elapsed time
-    elapsed_time = (current_time - last_input_time) / 1000
-    if monitor.debug_mode:
-        log(f"Last user input happened {elapsed_time} seconds ago. max allowed = {afk_time}")
-    
-    return elapsed_time >= afk_time
-    
-def get_window_name(pid):
-    def callback(hwnd, hwnds):
-        if win32gui.IsWindowVisible(hwnd) and win32gui.IsWindowEnabled(hwnd):
-            thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
-            if process_id == pid:
-                hwnds.append(hwnd)
-        return True
-
-    hwnds = []
-    win32gui.EnumWindows(callback, hwnds)
-
-    window_names = []
-    for hwnd in hwnds:
-        window_name = win32gui.GetWindowText(hwnd)
-        if window_name:
-            window_names.append(window_name)
-
-    if len(window_names) > 0:
-        return window_names
-    return None
+        # Calculate the elapsed time
+        elapsed_time = (current_time - last_input_time) / 1000
+        if monitor.debug_mode:
+            log(f"Last user input happened {elapsed_time} seconds ago. max allowed = {afk_time}")
+        
+        return elapsed_time >= afk_time
+    except:
+        log(traceback.format_exc())

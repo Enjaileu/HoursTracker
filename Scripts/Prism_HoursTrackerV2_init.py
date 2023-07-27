@@ -43,10 +43,17 @@ for path in os.environ['PYTHONPATH'].split(';'):
     sys.path.append(path)
 
 from Prism_HoursTrackerV2_Variables import Prism_HoursTrackerV2_Variables
-from Prism_HoursTrackerV2_Functions import Prism_HoursTrackerV2_Functions
+try:
+    from Prism_HoursTrackerV2_Functions import Prism_HoursTrackerV2_Functions
+    class Prism_HoursTrackerV2(Prism_HoursTrackerV2_Variables, Prism_HoursTrackerV2_Functions):
+        def __init__(self, core):
 
-class Prism_HoursTrackerV2(Prism_HoursTrackerV2_Variables, Prism_HoursTrackerV2_Functions):
-    def __init__(self, core):
-
-        Prism_HoursTrackerV2_Variables.__init__(self, core, self)
-        Prism_HoursTrackerV2_Functions.__init__(self, core, self)
+            Prism_HoursTrackerV2_Variables.__init__(self, core, self)
+            Prism_HoursTrackerV2_Functions.__init__(self, core, self)
+except:
+    class Prism_HoursTrackerV2():
+        def __init__(self, core):
+            self.version = "v2.1.0"
+            self.pluginName = "HoursTrackerV2"
+            self.pluginType = "Custom"
+            self.platforms = ["Windows"]

@@ -14,6 +14,7 @@ from monitor_utils.file import get_data
 from monitor_utils.data_management import update_data, push_data, get_processes, push_processes, remove_processes, get_last_process, push_last_process
 from monitor_utils.mhfx_log import log
 
+
 class Monitor(object):
     def __init__(self):
         self.thread = None
@@ -22,6 +23,9 @@ class Monitor(object):
         self.initialize_variables()
     
     def initialize_variables(self):
+        '''
+        Set the variables to initial value.
+        '''
         self.cycle_incr = 0
         self.processes = {}
         self.is_running = False
@@ -208,33 +212,48 @@ class Monitor(object):
                                 log(f" ~~~~~~~~~~~~~~~~ Cycle complete ~~~~~~~~~~~~~~~~")
                             self.cycle_incr = 0
                             self.manage_processes_data()
+
             except Exception as e:
                 log(f"An exception occurred: {e}")
                 log(traceback.format_exc())
     
     def change_last_proc_time(self, amount):
-        self.last_process = get_last_process(self.id)
-        if self.last_process != None:
-            self.other_session_sec += amount
-            if not self.other_session_sec >= monitor.max_afk_cycle:
-                last_pid = str(next(iter(self.last_process.keys())))
-                self.processes[last_pid]['time'] += amount
-                self.processes[last_pid]['status'] = Status.ACTIVE.name
-                push_processes(self.processes, self.id)
-                push_last_process({last_pid: self.processes[last_pid]})
-                
-                if monitor.debug_mode:
-                    log(f"last process updated by adding {amount} seconds :")
-                    log({last_pid: self.processes[last_pid]})
-                    log(f"Other session since {self.other_session_sec} sec.")
-            else:
-                if monitor.debug_mode:
-                    log(f"max_afk_cycle reached for other session")
-        elif monitor.debug_mode:
-            log("Not right monitor.")
-        
+        '''
+        If last process can be modified, update its key "time" by adding the amount in param.
+
+        :param amount: int
+        '''
+        try:
+            self.last_process = get_last_process(self.id)
+            if self.last_process != None:
+                self.other_session_sec += amount
+                if not self.other_session_sec >= monitor.max_afk_cycle:
+                    last_pid = str(next(iter(self.last_process.keys())))
+                    self.processes[last_pid]['time'] += amount
+                    self.processes[last_pid]['status'] = Status.ACTIVE.name
+                    push_processes(self.processes, self.id)
+                    push_last_process({last_pid: self.processes[last_pid]})
+                    
+                    if monitor.debug_mode:
+                        log(f"last process updated by adding {amount} seconds :")
+                        log({last_pid: self.processes[last_pid]})
+                        log(f"Other session since {self.other_session_sec} sec.")
+                else:
+                    if monitor.debug_mode:
+                        log(f"max_afk_cycle reached for other session")
+            elif monitor.debug_mode:
+                log("Not right monitor.")
+                self.other_session_sec = 0
+        except:
+            log(traceback.format_exc()) 
             
-    def saveClosedProcess(self):
+    def saveClosedProcess(self, save=True):
+        '''
+        Get all the processes in tmp file processes.json and remove them if they're closed.
+        Save their data before removing them if param save is True.
+
+        :param save: boolean
+        '''
         try:
             # get all processes from tmp file
             all_processes = get_processes()
@@ -246,22 +265,41 @@ class Monitor(object):
             for pid, infos in all_processes_copy.items():
                 # if process closed, write it to tracker data and remove it from processes list
                 if not does_process_exists(pid):
-                    if monitor.debug_mode:
-                        log(f"Write in tracker data, process {pid} infos.")
                     entity = get_entity(infos.get('filename'))
-                    if entity != None:
+                    if entity != None and save==True:
+                        if monitor.debug_mode:
+                            log(f"Write in tracker data, process {pid} infos.")
                         data = update_data(data, entity, infos.get('time'), infos.get('first'))
 
+                    if monitor.debug_mode:
+                        log(f"Remove process {pid} from processes.")
                     all_processes.pop(pid)
             
             # update processes tmp file
             push_processes(all_processes)
-     
+            
+            # write tracker data 
+            if save == True:
+                js_obj = json.dumps(data)
+                json_obj = json.dumps(data, indent=4)
+                push_data(js_obj, json_obj)
 
         except Exception as e:
             log(f"An exception occurred: {e}")
             log(traceback.format_exc())
-             
+
+    def reinitialise_last_process(self):
+        '''
+        If the last process is closed, reinitialise the tmp file last_process.json with {}.
+        '''
+        try:
+            last = get_last_process()
+
+            if not does_process_exists(str(next(iter(last.keys())))):
+                push_last_process({})
+        except Exception as e:
+            log(traceback.format_exc())
+
     def manage_processes_data(self):
         '''
         Execute an action according to the process status.
@@ -309,22 +347,5 @@ class Monitor(object):
 
         except Exception as e:
             log(f"An exception occurred: {e}")
-            log(traceback.format_exc())
-
-    def check_duplicate_pid(self, pid: int, processes: dict):
-        '''
-        Check in processes if pid already exists.
-
-        :param pid: int
-        :param processes: dict
-        :return: bool
-        '''
-        try:
-            for proc_pid in processes.keys():
-                proc_pid = int(proc_pid)
-                if proc_pid == pid:
-                    return True
-            return False
-        except Exception as e:
             log(traceback.format_exc())
 

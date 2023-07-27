@@ -145,8 +145,8 @@
 
                 // load table
                 var url = isCurrentWeek(selectedWeek, selectedYear)
-                    ? "U:/mesDocuments/HoursTrackerV2/hours.js"
-                    : "U:/mesDocuments/HoursTrackerV2/backup/" + selectedWeek + "_" + selectedYear + "_hours.js";
+                    ? "./hours.js"
+                    : "./backup/" + selectedWeek + "_" + selectedYear + "_hours.js";
 
                 
                 loadJSFile(url, function(succes) {
